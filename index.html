@@ -1,0 +1,1191 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="screen-orientation" content="landscape"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<title>Karakter Ragdoll</title>
+<style>
+:root{box-sizing:border-box}
+html,body{height:100%;margin:0;background:#342931;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;width:100%;height:100%}
+#joy,#joy2{position:fixed;bottom:22px;width:124px;height:124px;border-radius:50%;background:rgba(255,255,255,.08);border:3px solid rgba(255,255,255,.4)}
+#joy2.safe{border-color:rgba(46,158,107,.95);background:rgba(46,158,107,.12)}#knob2.safe{background:rgba(31,122,77,.95)!important}
+#joy{left:max(24px,env(safe-area-inset-left,0px))}#joy2{right:max(24px,env(safe-area-inset-right,0px))}
+#knob,#knob2{position:absolute;left:37px;top:37px;width:50px;height:50px;border-radius:50%;background:rgba(235,235,235,.88)}
+#knob2{box-sizing:border-box;background:rgba(28,28,28,.82);border:3px solid rgba(255,255,255,.72);display:flex;align-items:center;justify-content:center}#knob2 svg{display:block;width:34px;height:34px}
+#ammo{position:fixed;bottom:132px;right:calc(max(24px,env(safe-area-inset-right,0px)) + 186px);transform:translateX(50%);color:#fff;font:700 15px system-ui;text-shadow:0 1px 3px #000;opacity:.92}
+.b{position:fixed;bottom:42px;width:84px;height:84px;border-radius:50%;border:3px solid rgba(255,255,255,.55);background:rgba(25,25,25,.75);color:#fff;font:700 13px system-ui}
+.b:active{background:#444}
+#br{right:calc(max(24px,env(safe-area-inset-right,0px)) + 144px)}
+#bk{right:calc(max(24px,env(safe-area-inset-right,0px)) + 240px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0;transition:border-color .15s,background .15s}
+#bk svg{display:block;pointer-events:none;transition:transform .25s;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}#bk .kf{width:46px;height:auto;transform:rotate(-38deg)}#bk .ak{display:none;width:58px;height:auto}body.kn #bk .ak{display:block}body.kn #bk .kf{display:none}
+#bk.on .ak{transform:rotate(-8deg) scale(1.05)}
+#atk{position:fixed;bottom:22px;right:max(24px,env(safe-area-inset-right,0px));width:124px;height:124px;border-radius:50%;box-sizing:border-box;border:3px solid rgba(255,255,255,.55);background:rgba(25,25,25,.75);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:0;font:700 12px system-ui;letter-spacing:.5px;touch-action:none;transition:transform .08s,background .08s;-webkit-tap-highlight-color:transparent}
+#atk svg{width:74px;height:auto;display:block;transform:rotate(-36deg);pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.6));transition:transform .12s}
+#atk.dn{transform:scale(.93);background:#444}#atk.dn svg{transform:rotate(14deg) scale(1.08)}
+body.kn #joy2,body.kn #ammo{display:none}body.kn #atk{display:flex}body.kn #br{opacity:.32;pointer-events:none}
+/* GOROK: tombol serang jadi kuning & berdenyut (dut-dut) kalau dekat kepala mayat; tahan ~1 detik -> animasi gorok */
+#atk::after{content:'';position:absolute;inset:-8px;border-radius:50%;pointer-events:none;opacity:0;background:conic-gradient(#ffd21f calc(var(--p,0)*360deg),rgba(255,255,255,0) 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 6px),#000 calc(100% - 5px));mask:radial-gradient(farthest-side,transparent calc(100% - 6px),#000 calc(100% - 5px))}
+#atk.hold::after{opacity:1}
+#atk.fin{border-color:#ffd21f;background:rgba(255,205,20,.30);box-shadow:0 0 14px rgba(255,210,31,.35);animation:dut .74s ease-in-out infinite}
+#atk.fin svg{filter:drop-shadow(0 0 5px rgba(255,210,31,.95))}
+#atk.fin.dn,#atk.fin.hold{background:rgba(255,205,20,.52);animation-duration:.4s}
+@keyframes dut{0%{transform:scale(1)}12%{transform:scale(1.11);box-shadow:0 0 26px rgba(255,210,31,.85)}24%{transform:scale(.98);box-shadow:0 0 12px rgba(255,210,31,.4)}38%{transform:scale(1.14);box-shadow:0 0 30px rgba(255,210,31,.95)}58%,100%{transform:scale(1);box-shadow:0 0 14px rgba(255,210,31,.35)}}
+#rot{position:fixed;inset:0;background:#111;color:#eee;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;font:600 18px system-ui;z-index:9;text-align:center;padding:24px}
+#rot .ic{font-size:64px;display:inline-block;animation:r 1.6s ease-in-out infinite}
+@keyframes r{0%,30%{transform:rotate(0)}70%,100%{transform:rotate(-90deg)}}
+#go{padding:12px 22px;border-radius:10px;border:0;background:#ddd;font:700 15px system-ui}
+@media (orientation:portrait){#rot{display:flex}}
+
+#tr{position:fixed;top:10px;right:max(12px,env(safe-area-inset-right,0px));z-index:7;display:flex;align-items:flex-start;gap:8px}
+#rm{position:relative;display:flex;flex-direction:column;align-items:flex-end;font:700 12px system-ui;color:#fff}
+#rmb{height:34px;padding:0 12px;border-radius:8px;border:2px solid rgba(255,255,255,.6);background:rgba(25,25,25,.78);color:#fff;font:700 12px system-ui;letter-spacing:.3px;display:flex;align-items:center;gap:7px;white-space:nowrap}
+#rmb:active{background:#444}#rmb small{font:600 10px system-ui;opacity:.7}#rmb i{font-style:normal;display:inline-block;transition:transform .15s}#rm.open #rmb i{transform:rotate(180deg)}
+#rml{display:none;flex-direction:column;gap:5px;margin-top:6px;padding:6px;border-radius:10px;background:rgba(14,14,16,.86);border:2px solid rgba(255,255,255,.35);min-width:176px}
+#rm.open #rml{display:flex}
+.ro{display:flex;align-items:center;justify-content:space-between;gap:10px;height:36px;padding:0 11px;border-radius:7px;border:2px solid rgba(255,255,255,.22);background:rgba(255,255,255,.06);color:#fff;font:700 13px system-ui;text-align:left}
+.ro small{font:600 10px system-ui;opacity:.62}
+.ro:active{background:rgba(255,255,255,.2)}
+.ro.on{border-color:#58e070;background:rgba(46,158,107,.32)}
+.ro.on::after{content:"\2713";color:#8cf0a4;margin-left:2px}
+#rml hr{border:0;border-top:1px solid rgba(255,255,255,.2);margin:2px 0;width:100%}
+#bs{position:static;bottom:auto;width:auto;height:34px;padding:0 12px;border-radius:8px;border:2px solid rgba(255,255,255,.6);background:rgba(25,25,25,.78);display:flex;flex-direction:row;align-items:center;justify-content:center;gap:5px;font:700 12px system-ui;letter-spacing:.3px;white-space:nowrap}
+#bs b{font:400 22px/1 system-ui;margin-top:-2px}#bs small{font:700 12px/1 system-ui;letter-spacing:.3px}
+#toast{position:fixed;top:54px;right:max(12px,env(safe-area-inset-right,0px));z-index:7;padding:6px 11px;border-radius:7px;background:rgba(14,14,16,.86);border:2px solid #58e070;color:#fff;font:700 12px system-ui;opacity:0;transform:translateY(-4px);transition:opacity .18s,transform .18s;pointer-events:none}
+#toast.show{opacity:1;transform:none}
+
+/* ===== WEAPON WHEEL (gaya GTA V): tahan tombol ganti senjata -> lingkaran senjata, game slow-motion + latar blur ===== */
+#wh{position:fixed;inset:0;z-index:8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;pointer-events:none;opacity:0;visibility:hidden;background:radial-gradient(circle at 50% 50%,rgba(0,0,0,.10),rgba(0,0,0,.55));-webkit-backdrop-filter:blur(7px) brightness(.72) saturate(.85);backdrop-filter:blur(7px) brightness(.72) saturate(.85);transition:opacity .18s,visibility 0s .18s}
+#wh.on{opacity:1;visibility:visible;transition:opacity .18s}
+#wh svg{width:min(76vh,360px);height:auto;overflow:visible;transform:scale(.82);transition:transform .22s cubic-bezier(.2,1.35,.4,1)}
+#wh.on svg{transform:scale(1)}
+#wh .seg{fill:rgba(18,18,20,.58);stroke:rgba(255,255,255,.32);stroke-width:2;transition:fill .12s,stroke .12s}
+#wh .seg.sel{fill:rgba(255,255,255,.30);stroke:#fff;stroke-width:3}
+#wh .cur{fill:none;stroke:#ffd21f;stroke-width:3;opacity:0}#wh .cur.on{opacity:.95}
+#wh image{filter:drop-shadow(0 2px 3px rgba(0,0,0,.7))}
+#wh text{fill:#fff;font:800 17px system-ui,sans-serif;text-anchor:middle;letter-spacing:.06em;paint-order:stroke;stroke:rgba(0,0,0,.6);stroke-width:3px}
+#whh{color:rgba(255,255,255,.8);font:600 12px system-ui;text-shadow:0 1px 3px #000}
+#bk .gk{display:none;width:60px;height:auto;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));transition:transform .25s}body.kn.gl #bk .gk{display:block}body.kn.gl #bk .ak{display:none}#bk.on .gk{transform:rotate(-8deg) scale(1.05)}#bk .mk{display:none;width:62px;height:auto;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));transition:transform .25s}body.kn.m4 #bk .mk{display:block}body.kn.m4 #bk .ak,body.kn.m4 #bk .gk{display:none}#bk.on .mk{transform:rotate(-8deg) scale(1.05)}#bk .bn{display:none;width:62px;height:auto;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));transition:transform .25s}body.kn.bn #bk .bn{display:block}body.kn.bn #bk .ak,body.kn.bn #bk .gk,body.kn.bn #bk .mk{display:none}#bk.on .bn{transform:rotate(-8deg) scale(1.05)}
+
+/* ===== UI v44: tampilan kaca (glass) lebih rapi ===== */
+:root{--ac:#ffb340;--ok:#58e070;--gl1:rgba(44,48,60,.74);--gl2:rgba(14,16,22,.74)}
+#joy,#joy2{background:radial-gradient(circle at 50% 38%,rgba(255,255,255,.17),rgba(255,255,255,.04) 72%);border:2px solid rgba(255,255,255,.3);box-shadow:0 8px 24px rgba(0,0,0,.38),inset 0 0 24px rgba(255,255,255,.07);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+#joy2.safe{border-color:rgba(88,224,112,.9);background:radial-gradient(circle,rgba(46,158,107,.24),rgba(46,158,107,.06) 72%)}
+#knob{background:radial-gradient(circle at 35% 30%,#fff,#c9ced8 72%);box-shadow:0 3px 10px rgba(0,0,0,.5),inset 0 -3px 6px rgba(0,0,0,.16)}
+#knob2{background:radial-gradient(circle at 35% 30%,rgba(66,70,80,.96),rgba(22,24,30,.96));border:2px solid rgba(255,255,255,.62);box-shadow:0 3px 10px rgba(0,0,0,.5)}
+.b,#atk{background:linear-gradient(180deg,var(--gl1),var(--gl2));border:2px solid rgba(255,255,255,.32);box-shadow:0 8px 20px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.2);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);letter-spacing:.08em}
+.b{transition:transform .1s,background .15s,border-color .15s}
+.b:active{transform:scale(.93);background:linear-gradient(180deg,rgba(96,102,116,.85),rgba(40,44,54,.85))}
+#bk.on{border-color:var(--ac);box-shadow:0 0 16px rgba(255,179,64,.35),0 8px 20px rgba(0,0,0,.4)}
+#ammo{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:96px;padding:6px 14px 10px;border-radius:14px;overflow:hidden;background:linear-gradient(180deg,var(--gl1),var(--gl2));border:1.5px solid rgba(255,255,255,.28);box-shadow:0 6px 16px rgba(0,0,0,.4);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);text-shadow:none;opacity:1;bottom:128px}
+#ammo .wn{font:800 9px system-ui;letter-spacing:.16em;opacity:.62}
+#ammo .n{font:800 22px/1 system-ui;letter-spacing:.02em}#ammo .n small{font:700 12px system-ui;opacity:.55}
+#ammo .bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.12)}
+#ammo .bar i{display:block;height:100%;background:var(--ac);transition:width .15s,background .2s}
+#ammo.low .bar i{background:#ff5a42}
+#bs,#rmb{border-radius:999px;border:1.5px solid rgba(255,255,255,.3);background:linear-gradient(180deg,var(--gl1),var(--gl2));box-shadow:0 5px 14px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.18);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#rml{border-radius:16px;background:rgba(16,18,24,.84);border:1.5px solid rgba(255,255,255,.2);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 14px 32px rgba(0,0,0,.5)}
+.ro{border-radius:10px;border:1.5px solid rgba(255,255,255,.14)}
+.ro.on{border-color:var(--ok);background:rgba(88,224,112,.16)}
+#toast{border-radius:999px;border:1.5px solid rgba(255,255,255,.25);border-left:4px solid var(--ok);background:rgba(16,18,24,.86);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#wh .seg{fill:rgba(20,22,28,.64);stroke:rgba(255,255,255,.2)}
+#wh .seg.sel{fill:rgba(255,179,64,.26);stroke:var(--ac)}
+#wh .cur{stroke:var(--ok)}
+#whh{padding:5px 14px;border-radius:999px;background:rgba(16,18,24,.6)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="tr"><button class="b" id="bs" type="button" aria-label="Spawn bot"><b>+</b><small>BOT</small></button><div id="rm"><button id="rmb" type="button"><span>RELOAD: <b id="rmn">NORMAL</b></span><i>&#9662;</i></button><div id="rml"><button class="ro" type="button" data-m="0">Normal<small>standar</small></button><button class="ro" type="button" data-m="1">Fast<small>cepat</small></button><button class="ro" type="button" data-m="2">Tactical<small>simpan mag</small></button><button class="ro" type="button" data-m="3">Iraqi<small>satu tangan</small></button><hr><button class="ro" type="button" id="bldb">Darah<small id="bldn">ON</small></button><button class="ro" type="button" id="hapb">Getar HP<small id="hapn">ON</small></button></div></div></div><div id="toast"></div>
+<div id="joy"><div id="knob"></div></div><div id="joy2"><div id="knob2"><svg viewBox="0 0 50 50"><path d="M6 17.5h4.5v15H6z" fill="#fff"/><path d="M12.5 18.5H28Q40 18.5 46 25Q40 31.5 28 31.5H12.5z" fill="#fff"/><path d="M27 18.5V31.5" stroke="#1c1c1c" stroke-width="1.8" opacity=".55"/><path d="M11.4 18v14" stroke="#1c1c1c" stroke-width="1.6" opacity=".55"/></svg><svg id="shield" viewBox="0 0 50 50" style="display:none"><path d="M25 5L42 11.5V25C42 35.5 34.5 42 25 46C15.5 42 8 35.5 8 25V11.5Z" fill="#fff"/><path d="M16.5 25.5L22.5 31.5L34 19" fill="none" stroke="#1f7a4d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div><div id="ammo">30/30</div><button class="b" id="br">RELOAD</button><button class="b" id="bk" type="button" aria-label="Ganti senjata"><svg class="kf" viewBox="0 0 64 24" aria-hidden="true"><g fill="#fff" stroke="#1c1c1c" stroke-opacity=".55" stroke-width="1.1" stroke-linejoin="round"><rect x="1.5" y="8" width="6.5" height="8" rx="1.8"/><rect x="8" y="9.2" width="13" height="5.6"/><rect x="21" y="3.5" width="4.2" height="17" rx="1.6"/><path d="M25.2 8H47Q57 8.4 63 12.6Q56 15.6 46 16.2H25.2Z"/></g><path d="M11.5 9.4V14.6M14.5 9.4V14.6M17.5 9.4V14.6" stroke="#1c1c1c" stroke-opacity=".5" stroke-width="1.1"/><path d="M27.5 11.8H47" stroke="#1c1c1c" stroke-opacity=".4" stroke-width="1.2" stroke-linecap="round"/></svg><svg class="ak" viewBox="0 0 100 42" aria-hidden="true"><g fill="#fff" stroke="#1c1c1c" stroke-opacity=".55" stroke-width="1.1" stroke-linejoin="round"><path d="M1.5 14.5L23 15.5V25.5L5 31Q1.5 31.5 1.5 28Z"/><path d="M30.5 25H41.5L38 38.5H30.5Z"/><path d="M44 25H56L62 37Q63 40.5 59.5 40.5L53.5 40Q48 33 44 25Z"/><rect x="23" y="14" width="34" height="11.5" rx="1.5"/><rect x="38" y="10.5" width="9" height="3.5" rx="1"/><rect x="56" y="15.5" width="17" height="9.5" rx="2.5"/><rect x="56" y="11" width="21" height="3.6" rx="1.6"/><rect x="73" y="17.5" width="22" height="3.8" rx="1"/><rect x="95" y="15.5" width="4.5" height="7.8" rx="1"/><path d="M86 11.5H90V17.5H86Z"/></g><path d="M24 19.5H56" stroke="#1c1c1c" stroke-opacity=".4" stroke-width="1.1" stroke-linecap="round"/></svg><img class="gk" src="Image/Glockicon.png" alt=""><img class="mk" src="Image/M4icon.png?v=1" alt=""><img class="bn" src="Image/BenelliIcon.png?v=2" alt=""></button><button id="atk" type="button" aria-label="Serang pisau"><svg class="ka" viewBox="0 0 64 24" aria-hidden="true"><g fill="#fff" stroke="#1c1c1c" stroke-opacity=".55" stroke-width="1.1" stroke-linejoin="round"><rect x="1.5" y="8" width="6.5" height="8" rx="1.8"/><rect x="8" y="9.2" width="13" height="5.6"/><rect x="21" y="3.5" width="4.2" height="17" rx="1.6"/><path d="M25.2 8H47Q57 8.4 63 12.6Q56 15.6 46 16.2H25.2Z"/></g><path d="M11.5 9.4V14.6M14.5 9.4V14.6M17.5 9.4V14.6" stroke="#1c1c1c" stroke-opacity=".5" stroke-width="1.1"/><path d="M27.5 11.8H47" stroke="#1c1c1c" stroke-opacity=".4" stroke-width="1.2" stroke-linecap="round"/></svg></button>
+<div id="wh"><svg id="whs" viewBox="-170 -170 340 340"></svg><div id="whh">Geser ke senjata, lepas untuk memilih</div></div>
+<div id="rot"><div class="ic">📱</div><div>Putar HP ke mode landscape</div><button id="go">Layar penuh</button></div>
+<script>
+// v12: mode multiplayer DINONAKTIFKAN (tidak ada koneksi jaringan). Game berjalan single player.
+const BUILD=28;
+</script>
+<script src="config.js?v=1"></script>
+<script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d',{alpha:false}),bgc=document.createElement('canvas'),K=.58,GK=.40,HK=1.08,SY=394,VH=470,RT=2.35,RS=1; // VH = tinggi dunia yang terlihat (makin besar = ruangan makin luas, karakter makin kecil)
+let S,VW,mx=0,my=0,ax=0,ay=0,camX=0,camY=0;
+let DQ=Math.min(devicePixelRatio||1,3);
+function rs(){const D=DQ;try{HQRESET()}catch(e){}cv.width=innerWidth*D;cv.height=innerHeight*D;S=cv.height/VH;VW=cv.width/S;
+ bgc.width=cv.width;bgc.height=cv.height;const g2=bgc.getContext('2d');g2.fillStyle='#342931';g2.fillRect(0,0,cv.width,cv.height);const g=g2.createRadialGradient(cv.width*.98,cv.height*.1,0,cv.width*.98,cv.height*.1,cv.width*.6);g.addColorStop(0,'rgb(120,115,114)');g.addColorStop(1,'rgba(52,41,49,0)');g2.fillStyle=g;g2.fillRect(0,0,cv.width,cv.height)}
+rs();
+// ---- sprite HD: tiap gambar digambar dari versi 3x yang sudah dihaluskan, diturunkan tepat ke ukuran layar (di-cache) -> tepi mulus & tajam
+var HQC={};
+const _di=ctx.drawImage.bind(ctx);
+function HQRESET(){for(const im of HDI.keys())im._m=null}
+ctx.drawImage=function(im,...a){const hd=a.length===4&&typeof HDI!=='undefined'&&HDI.get(im),[x,y,w,h]=a;
+ if(hd&&w>0){const tw=Math.max(1,Math.round(w*S)),th=Math.max(1,Math.round(h*S)),k=tw*8192+th,M=im._m||(im._m=new Map());let c=M.get(k);
+  if(!c){c=document.createElement('canvas');c.width=tw;c.height=th;const g=c.getContext('2d');g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';g.drawImage(hd,0,0,tw,th);M.set(k,c)}
+  return _di(c,x,y,w,h)}
+ return _di(im,...a)};
+// ---- landscape + layar penuh otomatis
+const root=document.documentElement,fsOn=()=>document.fullscreenElement||document.webkitFullscreenElement,land=()=>innerWidth>innerHeight;
+function lockL(){try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{})}catch(e){}}
+function goFS(){try{if(fsOn()){lockL();return}const r=root.requestFullscreen||root.webkitRequestFullscreen;if(r){const p=r.call(root);if(p&&p.then)p.then(lockL).catch(()=>{})}}catch(e){}}
+addEventListener('resize',()=>{rs();if(land())goFS()});
+addEventListener('pointerdown',()=>{if(land()&&!fsOn())goFS()},true);
+document.getElementById('go').addEventListener('click',goFS);
+if(screen.orientation&&screen.orientation.addEventListener)screen.orientation.addEventListener('change',()=>{if(land())goFS()});
+// ---- aset
+const IM={},names=['Body1','Body2','Body3','Foot1','Foot2','HandCupR','HandCupL','HandGripR','HandGripL','HandFistR','HandFistL','HandMagR','HandMagL','AK','Mag'];for(const pre of ['Head','HeadU','HeadD'])for(let i=3;i<=7;i++)names.push(pre+i);names.push('Knife','GlockF','GlockS','GMag','M4','M4Mag','Benelli','BenelliMag');let ld=0;
+const HDI=new Map();let need=names.length*2;const done=()=>{if(--need==0)start()};
+names.forEach(n=>{const i=new Image();i.onload=done;i.src='Image/'+n+'.png?v=9';IM[n]=i;
+ const h=new Image();h.onload=()=>{HDI.set(i,h);done()};h.onerror=done;h.src='Image/hd/'+n+'.png?v=9'}); // Image/hd = versi 3x yang sudah dihaluskan (tepi mulus)
+const SFX=new Audio('Sound/reload.wav');SFX.preload='auto';let SB=null,SS=null;const SFXM=['reload_fast','reload_tactical','reload_iraqi'].map(n=>{const a=new Audio('Sound/'+n+'.mp3?v=11');a.preload='auto';return a}),SBM=[null,null,null,null];
+// ---- titik pegang di senjata (pecahan lebar/tinggi sprite AK) -> ubah di sini kalau posisi tangan kurang pas
+let GRIP=[.77,.72],HGUARD=[.661,.30],MAGC=[.535,.82],MAGH=[.535,.84],GRIPH=[.334,.70],MUZ=[.977,.307],EJP=[.51,.217],MAGN=30,GY=-.74,CHF=[.556,.104],CHB=[.476,.104],GWD=270,GXO=-12,TOPR=[.326,.10],SEL=[.418,.346],CKT=[.46,-.62];const MK=1,SFXT=.38,SFXO=.123,GX=.5;
+// ---- tabel senjata api (v39): AK-47 & Glock 17. Titik-titik = pecahan lebar/tinggi sprite. useW(i) menukar semua konstanta di atas.
+const WT=[{gim:'AK',mim:'Mag',GRIP:[.77,.72],HGUARD:[.661,.30],MAGC:[.535,.82],MAGH:[.535,.84],GRIPH:[.334,.70],MUZ:[.977,.307],EJP:[.51,.217],MAGN:30,GY:-.74,CHF:[.556,.104],CHB:[.476,.104],GWD:270,GXO:-12},
+ {gim:'GlockF',mim:'GMag',GRIP:[.243,.609],HGUARD:[.40,.70],MAGC:[.228,.599],MAGH:[.148,.933],GRIPH:[.243,.609],MUZ:[.992,.124],EJP:[.522,.093],MAGN:17,GY:-.76,CHF:[.2,.1],CHB:[.1,.1],GWD:112,GXO:57},
+ // M4A1 (v43): sprite dari foto referensi (laras sudah diluruskan, magazen dipisah). TOPR = tangan di atas receiver (reload Iraqi), SEL = tuas selector (animasi safety), CKT = titik tangan cek magazen
+ {gim:'M4',mim:'M4Mag',GRIP:[.77,.775],HGUARD:[.672,.32],MAGC:[.4621,.8106],MAGH:[.4621,.848],GRIPH:[.261,.758],MUZ:[.9962,.3012],EJP:[.47,.28],MAGN:30,GY:-.726,CHF:[.31,.26],CHB:[.23,.26],GWD:262,GXO:-6,TOPR:[.40,.06],SEL:[.40,.35],CKT:[.46,-.62]},
+ // BENELLI M4 (v44): sprite dari gambar Madness Combat (laras diluruskan). Magazen = pembawa selongsong merah. 7 peluru, 1 tembakan = 1 hit mati, recoil brutal (lihat bnShot)
+ {gim:'Benelli',mim:'BenelliMag',GRIP:[.72,.62],HGUARD:[.66,.37],MAGC:[.47,.30],MAGH:[.47,.36],GRIPH:[.265,.60],MUZ:[.996,.30],EJP:[.50,.22],MAGN:7,GY:-.73,CHF:[.47,.25],CHB:[.37,.25],GWD:270,GXO:-6,TOPR:[.45,.05],SEL:[.42,.42],CKT:[.46,-.62]}];
+let GIM=null,MIM=null,WI=0;const AMM=[30,17,30,7];
+function useW(i){i=i|0;if(GIM&&i===WI)return;const w=WT[i];WI=i;GRIP=w.GRIP;HGUARD=w.HGUARD;MAGC=w.MAGC;MAGH=w.MAGH;GRIPH=w.GRIPH;MUZ=w.MUZ;EJP=w.EJP;MAGN=w.MAGN;GY=w.GY;CHF=w.CHF;CHB=w.CHB;GWD=w.GWD;GXO=w.GXO;TOPR=w.TOPR||[.326,.10];SEL=w.SEL||[.418,.346];CKT=w.CKT||[.46,-.62];GIM=IM[w.gim];MIM=IM[w.mim];GW=GWD;GH=GWD*GIM.height/GIM.width;MS=GW/GIM.width;MW=MIM.width*MS*MK;MH=MIM.height*MS*MK}
+const SAFE_ANG=.85,SAFE_X=22,SAFE_Y=-.45; // pose safety: sudut moncong naik (rad), posisi gagang di badan (x px, y pecahan tinggi badan)
+const AIM_UP=.4,AIM_DOWN=.65,FIRE_PUSH=24; // batas sudut bidik ke atas / ke bawah (radian: .4=~23°, .65=~37°); FIRE_PUSH = seberapa jauh joystick didorong sebelum menembak (px, maks ~45)
+const cl=(v,a,c)=>Math.max(a,Math.min(c,v)),pw=Math.pow,lp=(a,c,t)=>a+(c-a)*t,sg=(p,a,c)=>{const t=cl((p-a)/(c-a),0,1);return t*t*(3-2*t)};
+const P=()=>({x:0,y:0,vx:0,vy:0});
+// siklus langkah: p = fase (rad). Hasil [posisi kaki -1..1 (depan +), tinggi angkat 0..1, putaran telapak (+ = ujung turun)]
+// tumpuan = geser lurus (kaki menempel lantai, tidak meluncur), ayunan = melengkung halus (smoothstep) + angkat
+const gait=p=>{p=((p+Math.PI/2)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+ if(p<Math.PI){const t=p/Math.PI,e=t*t*(3-2*t);return[-1+2*e,Math.sin(Math.PI*t)*.8,lp(.26,-.16,e)]}
+ const t=(p-Math.PI)/Math.PI;return[1-2*t,0,t<.15?lp(-.16,0,t/.15):t>.7?lp(0,.26,(t-.7)/.3):0]};
+let b={x:0,z:0,vx:0,vz:0,dir:1,t:1,ph:0,br:0,tilt:0,rl:-1,px:0,py:0,rot:0,lastStep:0,lean:0,sw:-1,ck:-1},head=P(),hand=[P(),P()],foot=[P(),P()],gA={x:0,y:0,vx:0,vy:0,r:0,vr:0},gun={x:0,y:0,r:0},dust=[],drops=[],bullets=[],shells=[];
+let ammo=30,fireS=false,cd=0,shk=0,RIGID=null;
+// ---- rig: tiap pemain (lokal & remote) punya state animasi sendiri, dijalankan dengan step()/drawChar() yang SAMA
+let REM=false;
+const mkRig=()=>({b:{x:0,z:0,vx:0,vz:0,dir:1,t:1,ph:0,br:0,tilt:0,rl:-1,px:0,py:0,rot:0,lastStep:0,lean:0,sw:-1,ck:-1},head:P(),hand:[P(),P()],foot:[P(),P()],gA:{x:0,y:0,vx:0,vy:0,r:0,vr:0},gun:{x:0,y:0,r:0},ammo:MAGN,cd:0,mx:0,my:0,ax:0,ay:0,fireS:false});
+const takeRig=()=>({b,head,hand,foot,gA,gun,ammo,cd,mx,my,ax,ay,fireS});
+function putRig(R){({b,head,hand,foot,gA,gun,ammo,cd,mx,my,ax,ay,fireS}=R)}
+function withRig(R,fn){const L=takeRig(),was=REM,wid=RIGID;REM=true;RIGID=R.pid||null;putRig(R);try{fn()}finally{Object.assign(R,takeRig());putRig(L);REM=was;RIGID=wid}}
+let Bw,BHt,FHt,HU,GW,GH,MS,MW,MH,FXn,frz=0;
+function start(){Bw=IM.Body1.width*K;BHt=IM.Body1.height*K;FHt=IM.Foot1.height*K;HU=IM.Head5.height*K*.18;useW(0);KNF.H=KNF.W*IM.Knife.height/IM.Knife.width;FXn=[-34*K,34*K];
+ camX=-VW/2;camY=-SY;requestAnimationFrame(loop);
+ // pemanasan: baca peta alfa sprite badan/kepala satu per satu di waktu senggang, supaya tembakan pertama tidak patah-patah
+ setTimeout(()=>{const ks=Object.keys(IM).filter(k=>/^(Body|Head)/.test(k));let i=0;(function nx(){if(i<ks.length){try{alp(IM[ks[i++]])}catch(e){}setTimeout(nx,40)}})()},1200)}
+function sp(p,tx,ty,k,d,f){const dd=pw(d,f);p.vx=(p.vx+(tx-p.x)*k*f)*dd;p.vy=(p.vy+(ty-p.y)*k*f)*dd;p.x+=p.vx*f;p.y+=p.vy*f}
+// tekuk pinggang: badan atas (di atas pinggang) berputar sebesar b.sb terhadap pinggul -> kepala & senjata ikut, jadi tidak kaku satu papan
+const Sp=(lx,ly)=>{const c=Math.cos(b.sb||0),s=Math.sin(b.sb||0),py=-BHt*.45,dy=ly-py;return[lx*c-dy*s,py+lx*s+dy*c]};
+function drawBody(im,x,y,rot,sb,sy){ctx.save();ctx.translate(x,y);ctx.rotate(rot);if(sy)ctx.scale(1,sy);
+ if(Math.abs(sb)<.004){ctx.drawImage(im,-Bw/2,-BHt,Bw,BHt);ctx.restore();return}
+ const wy=-BHt*.45;
+ ctx.save();ctx.beginPath();ctx.rect(-Bw,wy-5,Bw*2,-wy+20);ctx.clip();ctx.drawImage(im,-Bw/2,-BHt,Bw,BHt);ctx.restore();
+ ctx.translate(0,wy);ctx.rotate(sb);ctx.translate(0,-wy);
+ ctx.beginPath();ctx.rect(-Bw,-BHt-20,Bw*2,BHt*.55+20+6);ctx.clip();ctx.drawImage(im,-Bw/2,-BHt,Bw,BHt);ctx.restore()}
+const Bp=(lx,ly)=>{const c=Math.cos(b.rot),s=Math.sin(b.rot);return[b.px+lx*c-ly*s,b.py+lx*s+ly*c]};
+const Gp=(fx,fy)=>{const lx=(fx-.5)*GW*b.dir,ly=(fy-.5)*GH,c=Math.cos(gun.r),s=Math.sin(gun.r);return[gun.x+lx*c-ly*s,gun.y+lx*s+ly*c]};
+function reload(){if(!REM&&ME.dead)return;if(b.rl<0&&!b.safe&&!(b.sw>=0)&&!b.wm&&!(b.wt>=0)){b.rm=(b.gw|0)==1?4:(REM?cl(b.rmNext|0,0,3):MODE);b.rl=0;b.ev=0;b.dropped=0;if(!REM)stopSfx()}}
+const SWA=[new Audio('Sound/safety_on.mp3?v=8'),new Audio('Sound/safety_off.mp3?v=8'),new Audio('Sound/check_mag.mp3?v=8')];let SWB=[null,null,null];SWA.forEach(a=>a.preload='auto');
+function playSw(to){playSnd(to?0:1)}
+function playSnd(i){try{if(AC&&SWB[i]&&AC.state=='running'){const s=AC.createBufferSource();s.buffer=SWB[i];s.connect(AC.destination);s.start()}else{const a=SWA[i];a.currentTime=0;a.play().catch(()=>{})}}catch(e){}}
+// animasi ganti mode safety (mengikuti video): to=true -> pasang safety (singkat), to=false -> lepas safety + tarik charging handle
+const SW_FLIP=.58,SW_ON=.95,SW_OFF=1.72,CK_T=2.5;
+function startSw(to){if(b.sw>=0||!!b.fsafe===!!to)return false;b.sw=0;b.swTo=!!to;b.swd=0;if(!REM){ax=ay=0;fireS=false;playSw(to)}return true}
+function stopSfx(){try{SFX.pause();SFX.currentTime=0;SFXM.forEach(a=>{a.pause();a.currentTime=0});if(SS){SS.stop();SS=null}}catch(e){}}
+function playSfx(i){i=i|0;try{const bf=i?SBM[i]:SB;if(AC&&bf&&AC.state=='running'){SS=AC.createBufferSource();SS.buffer=bf;SS.connect(AC.destination);SS.start()}else{const a=i?SFXM[i-1]:SFX;a.currentTime=0;a.play().catch(()=>{})}}catch(e){}}
+function sfxLead(){return AC?Math.min(.15,(AC.baseLatency||0)+(AC.outputLatency||0)):.03}
+// interpolasi Catmull-Rom (halus, tanpa berhenti-jalan) lewat keyframe [waktu,[nilai...]]
+function hm(K,t){const n=K.length;if(t<=K[0][0])return K[0][1].slice();if(t>=K[n-1][0])return K[n-1][1].slice();let i=0;while(K[i+1][0]<t)i++;
+ const A=K[Math.max(i-1,0)],B=K[i],C=K[i+1],D=K[Math.min(i+2,n-1)],h=C[0]-B[0],u=(t-B[0])/h,u2=u*u,u3=u2*u;
+ return B[1].map((v,j)=>{const m1=(C[1][j]-A[1][j])/(C[0]-A[0]||1)*h,m2=(D[1][j]-B[1][j])/(D[0]-B[0]||1)*h;
+  return(2*u3-3*u2+1)*v+(u3-2*u2+u)*m1+(-2*u3+3*u2)*C[1][j]+(u3-u2)*m2})}
+const TL=[[0,[0,0,0]],[.3,[.1,4,-2]],[.7,[.16,7,-4]],[1.1,[.2,8,-5]],[1.5,[.15,6,-4]],[1.9,[.07,3,-2]],[2.35,[0,0,0]]];
+// ================= MODE RELOAD + GETARAN (v11) =================
+// Mode reload: 0 Normal, 1 Fast, 2 Tactical, 3 Iraqi (dipilih lewat tombol kanan atas). Waktu (detik) mengikuti video referensi.
+let MODE=0,HAP=true;try{MODE=cl(parseInt(localStorage.getItem('rmode'))||0,0,3)|0;HAP=localStorage.getItem('hap')!=='0'}catch(e){}
+const CK={x:0,y:0};let LV=0; // CK = tendangan kamera (recoil), LV = waktu getar terakhir
+function vib(p){if(!HAP||REM)return;try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
+function vibShot(){const n=performance.now();if(n-LV>55){LV=n;vib(15)}}
+// ev: [waktu, dorongan y senjata, dorongan rotasi, getar HP (ms)]
+const RM=[
+ {id:'normal',RT:2.35,sfxT:.38,ammoT:1.1,drop:.48,ev:[[.5,1.6,.02,10],[.82,2.4,.03,16],[1.0,1.2,.015,0],[1.6,.9,-.015,10],[1.78,.9,.015,0]]},
+ {id:'fast',RT:1.95,sfxT:.25,ammoT:.98,drop:.46,ev:[[.3,1.2,.02,8],[.46,.8,.015,0],[.98,2.2,-.03,18],[1.28,1.6,.02,14],[1.46,1.0,-.02,8]]},
+ {id:'tactical',RT:3.1,sfxT:.25,ammoT:1.62,drop:-1,ev:[[.3,.8,.01,6],[1.02,1.2,.02,10],[1.62,2.0,.03,18],[2.4,.8,-.01,8],[2.75,.6,0,6]]},
+ {id:'iraqi',RT:3.1,sfxT:.25,ammoT:2.12,drop:.95,ev:[[.3,.9,0,6],[.95,1.6,.03,14],[1.28,.8,0,0],[2.05,2.2,-.04,18],[2.3,1.1,.02,10],[2.72,.8,0,6]]}];
+RM.push({id:'glock',RT:2.25,sfxT:99,ammoT:1.14,drop:.46,ev:[[.28,.8,.01,6],[.5,1.2,.02,8],[1.1,1.4,.02,12],[1.5,.8,0,6],[1.8,2,-.03,14]],snd:[[.30,'magout'],[1.06,'magin'],[1.44,'rackp'],[1.78,'rackr']]});
+RM.forEach(m=>{m.TL=TL.map(k=>[k[0]*m.RT/2.35,k[1]])});
+RM[4].TL=[[0,[0,0,0]],[.3,[.04,2,-1]],[.9,[.09,4,-2]],[1.5,[.07,3,-2]],[1.9,[.03,1,-1]],[2.25,[0,0,0]]];
+const mixp=(a,c,k)=>[lp(a[0],c[0],k),lp(a[1],c[1],k)];
+// jalur tangan penyangga + magazen per mode (fast/tactical/iraqi); Normal tetap memakai jalur asli di step()
+function modeRun(i,t,d){
+ if(i==4)return glockRun(t,d);
+ const hg=Gp(...HGUARD),mh=Gp(...MAGH),c1=Gp(...CHF),c0=Gp(...CHB),top=Gp(...TOPR),grip=Gp(...GRIPH),belt=Bp(d*34,-BHt*.4),
+  I=(p,x,y)=>[p[0]+d*x,p[1]+y],R={sp:'Cup',gm:true,hd:[],h1:null,h1s:'Grip',tg:null};
+ if(i==1){ // FAST: tarik mag, buang, mag baru dari bawah, masuk, tepuk charging handle
+  R.tg=hm([[0,hg],[.12,I(mixp(hg,mh,.55),0,14)],[.26,I(mh,0,6)],[.38,I(mh,3,24)],[.48,I(mh,10,40)],[.62,I(mh,18,52)],[.76,I(mh,8,36)],[.88,I(mh,3,18)],[.98,I(mh,0,6)],[1.06,I(mh,-2,16)],[1.18,I(c1,6,-4)],[1.28,c1],[1.38,c0],[1.48,I(c0,18,22)],[1.58,mixp(c1,hg,.5)],[1.72,I(hg,0,6)],[1.88,hg],[1.95,hg]],t);
+  R.sp=t<.3?'Cup':t<.98?'Mag':t<1.1?'Cup':t<1.66?'Fist':'Cup';
+  R.gm=t<.3||t>=.98;
+  if(t>=.3&&t<.46)R.hd.push({wi:0,r:lp(gun.r,d*.14,sg(t,.3,.46))});
+  if(t>=.5&&t<.98)R.hd.push({wi:sg(t,.82,.98),r:lp(d*.14,gun.r,sg(t,.72,.98))});
+ }else if(i==2){ // TACTICAL: mag baru dari ikat pinggang, mag lama TETAP dipegang lalu dimasukkan lagi ke pinggang
+  R.tg=hm([[0,hg],[.14,I(mh,-30,34)],[.28,belt],[.45,belt],[.58,I(belt,2,-4)],[.7,I(mh,-20,44)],[.82,I(mh,-6,26)],[.92,I(mh,0,8)],[1.02,I(mh,3,16)],[1.12,I(mh,10,34)],[1.26,I(mh,30,56)],[1.4,I(mh,12,30)],[1.5,I(mh,2,12)],[1.62,I(mh,0,4)],[1.76,I(mh,4,16)],[1.9,I(mh,16,40)],[2.05,I(mh,28,48)],[2.18,I(mh,18,40)],[2.3,I(mh,-14,52)],[2.42,belt],[2.55,I(belt,0,6)],[2.7,I(mh,0,50)],[2.82,I(hg,0,10)],[2.98,hg],[3.1,hg]],t);
+  R.sp=t<.3?'Cup':t<2.42?'Mag':t<2.7?'Fist':'Cup';
+  R.gm=t<1.05||t>=1.62;
+  if(t>=1.05&&t<2.4)R.hd.push({wi:0,dx:d*3,dy:4,r:lp(gun.r,d*.14,sg(t,1.02,1.15))});
+  if(t>=.5&&t<1.62)R.hd.push({wi:sg(t,1.45,1.62),r:lp(d*.12,gun.r,sg(t,1.35,1.62))});
+ }else{ // IRAQI: tangan pelatuk naik memegang atas receiver, tangan lain buang mag & ambil yang baru
+  R.tg=hm([[0,hg],[.3,hg],[.5,I(hg,6,8)],[.62,mixp(hg,mh,.6)],[.74,I(mh,0,6)],[.84,I(mh,4,22)],[.96,I(mh,18,50)],[1.08,belt],[1.2,I(mh,0,36)],[1.34,I(mh,16,62)],[1.5,I(mh,34,88)],[1.62,I(mh,32,84)],[1.75,I(mh,14,56)],[1.88,I(mh,4,32)],[2.0,I(mh,-2,16)],[2.12,I(mh,0,8)],[2.26,I(mh,3,22)],[2.4,I(mh,8,44)],[2.6,I(mh,0,52)],[2.8,I(hg,0,16)],[2.98,hg],[3.1,hg]],t);
+  R.sp=t<.84?'Cup':t<.96?'Mag':t<1.1?'Cup':t<2.3?'Mag':'Cup';
+  R.gm=t<.84||t>=2.12;
+  if(t>=.84&&t<.95)R.hd.push({wi:0,r:lp(gun.r,d*.14,sg(t,.84,.95))});
+  if(t>=1.1&&t<2.12)R.hd.push({wi:sg(t,1.95,2.12),r:lp(d*.12,gun.r,sg(t,1.85,2.12))});
+  R.h1=hm([[0,grip],[.14,grip],[.32,I(top,0,-4)],[.46,top],[2.4,top],[2.6,mixp(top,grip,.6)],[2.74,grip],[3.1,grip]],t);
+  R.h1s=t<.14?'Grip':t<.4?'Cup':t<2.55?'Fist':'Grip'}
+ return R}
+
+
+// ================= GLOCK 17 (v39) =================
+// Reload mengikuti video: tangan bebas turun ke dasar gagang -> magazen lama ditarik & jatuh -> ambil magazen baru dari ikat pinggang -> masuk dari bawah -> tepuk -> tarik slide (rack) -> lepas.
+// Nembak: slide mundur lalu balik, selongsong terlempar ke belakang-atas dari lubang ejeksi; peluru habis -> slide terkunci mundur sampai reload.
+const SLDK=.115,GL_MB=[.116,1.04];
+function glockRun(t,d){
+ const hg=Gp(...HGUARD),mb=Gp(...GL_MB),gm=Gp(...MAGC),mh=Gp(...MAGH),belt=Bp(d*30,-BHt*.36),I=(p,x,y)=>[p[0]+d*x,p[1]+y],ho=[gm[0]-mh[0],gm[1]-mh[1]];
+ const so=sg(t,1.48,1.74)*(1-sg(t,1.80,1.865));b.slr=so;
+ const rk=Gp(.085-SLDK*so,.045),R={sp:'Cup',gm:t<.26||t>=1.14,hd:[],h1:null,h1s:'Grip',tg:null};
+ R.tg=hm([[0,hg],[.14,I(mixp(hg,mb,.6),4,4)],[.26,I(mb,4,-2)],[.34,I(mb,-1,12)],[.42,I(mb,-8,32)],[.5,I(mb,-16,50)],[.64,I(belt,6,-8)],[.74,belt],[.82,I(belt,2,-14)],[.92,I(mb,-12,48)],[1.02,I(mb,-6,30)],[1.1,I(mb,0,14)],[1.16,I(mb,3,3)],[1.24,I(mb,3.6,-3)],[1.34,I(mixp(mb,rk,.45),-10,-6)],[1.46,I(rk,-4,-10)],[1.52,rk],[1.74,rk],[1.8,rk],[1.88,I(rk,-6,-16)],[2.0,I(mixp(rk,hg,.5),0,-10)],[2.14,I(hg,0,-2)],[2.25,hg]],t);
+ R.sp=t<.26?'Cup':t<.5?'Mag':t<.72?'Cup':t<1.16?'Mag':t<1.9?'Fist':'Cup';
+ if(t>=.26&&t<.46)R.hd.push({wi:1-sg(t,.26,.40),r:gun.r,dx:ho[0],dy:ho[1]});
+ if(t>=.74&&t<1.14)R.hd.push({wi:sg(t,.98,1.14),r:lp(d*.06,gun.r,sg(t,.82,.98)),dx:ho[0],dy:ho[1]});
+ return R}
+function ejectShell(d){const p=Gp(EJP[0]-.05,EJP[1]),c=Math.cos(gun.r),s=Math.sin(gun.r),lx=-(2+Math.random()*1.8),ly=-(5+Math.random()*2.4);
+ shells.push({x:p[0],y:p[1],vx:d*lx*c-ly*s+(b.vx||0)*.4,vy:d*lx*s+ly*c-.4,r:Math.random()*6.28,vr:(Math.random()-.5)*1.1,l:1,gy:b.z-3+(Math.random()-.5)*8,s:1.1})}
+const GSN=['shot1','shot2','magout','magin','rackp','rackr','akshot','m4shot','bnshot','bnclack'],GSA={},GSB={},GSP=n=>'Sound/'+(n=='akshot'?'ak_shot':n=='m4shot'?'m4_shot':n=='bnshot'?'shotgun':n=='bnclack'?'shotgun_cycle':'glock_'+n)+'.mp3?v=3';GSN.forEach(n=>{const a=new Audio(GSP(n));a.preload='auto';GSA[n]=a});
+function gload(){GSN.forEach(n=>fetch(GSP(n)).then(r=>r.arrayBuffer()).then(x=>AC.decodeAudioData(x)).then(x=>{GSB[n]=x}).catch(()=>{}))}
+function gsnd(n,v){try{if(AC&&GSB[n]&&AC.state=='running'){const s=AC.createBufferSource(),g=AC.createGain();s.buffer=GSB[n];g.gain.value=v||1;s.connect(g);g.connect(AC.destination);s.start();return true}const a=GSA[n];if(a){const c=a.cloneNode();c.volume=Math.min(1,v||1);c.play().catch(()=>{});return true}}catch(e){}return false}
+function gbang(){if(!gsnd('shot'+(Math.random()<.5?1:2)))bang()}
+function abang(){if(!gsnd('akshot',.85))bang()}
+function mbang(){if(!gsnd('m4shot',.9))bang()}
+function nbang(){if(!gsnd('bnshot',1.25))bang()}
+function tink(x){if(!AC||AC.state!='running'||Math.abs(x-camX-VW/2)>VW)return;try{const t0=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.type='triangle';o.frequency.setValueAtTime(3000+Math.random()*1400,t0);g.gain.setValueAtTime(.05,t0);g.gain.exponentialRampToValueAtTime(.001,t0+.09);o.connect(g);g.connect(AC.destination);o.start(t0);o.stop(t0+.1)}catch(e){}}
+function setGun(i){if(REM){b.gw=i;useW(i);b.slt=null;b.slLock=0;ammo=[30,17,30,7][i];return}const o=b.gw|0;AMM[o]=ammo;b.gw=i;useW(i);ammo=AMM[i];b.slt=null;b.slLock=(i==1&&ammo<=0)?1:0;document.body.classList.toggle('gl',i==1);document.body.classList.toggle('m4',i==2);document.body.classList.toggle('bn',i==3);updAmmo()}
+function equipGun(i){if(ME.dead||b.rl>=0||b.sw>=0||b.wt>=0||b.fn)return;
+ if(b.wm){if((b.gw|0)!==i)setGun(i);toggleKnife();return}
+ if((b.gw|0)===i)return;b.sw=0;b.swG=i;b.swd=0;b.safe=true;ax=ay=0;fireS=false;vib(10)}
+const WNM=['AK-47','GLOCK 17','M4A1','BENELLI M4'];
+function updAmmo(){if(REM)return;const e=document.getElementById('ammo');e.innerHTML='<span class="wn">'+(WNM[WI|0]||'')+'</span><span class="n">'+ammo+'<small> / '+MAGN+'</small></span><span class="bar"><i style="width:'+Math.round(100*ammo/MAGN)+'%"></i></span>';e.classList.toggle('low',ammo<=Math.ceil(MAGN*.2));e.style.color=ammo?'#fff':'#ff6a4a'}
+let AC=null,NB=null;
+function audioInit(){try{if(!AC){AC=new(window.AudioContext||window.webkitAudioContext)();kload();gload();fetch('Sound/reload.wav').then(r=>r.arrayBuffer()).then(x=>AC.decodeAudioData(x)).then(x=>{SB=x}).catch(()=>{});['reload_fast','reload_tactical','reload_iraqi'].forEach((n,i)=>fetch('Sound/'+n+'.mp3?v=11').then(r=>r.arrayBuffer()).then(x=>AC.decodeAudioData(x)).then(x=>{SBM[i+1]=x}).catch(()=>{}));['safety_on','safety_off','check_mag'].forEach((n,i)=>fetch('Sound/'+n+'.mp3?v=8').then(r=>r.arrayBuffer()).then(x=>AC.decodeAudioData(x)).then(x=>{SWB[i]=x}).catch(()=>{}));const n=AC.sampleRate*.25|0;NB=AC.createBuffer(1,n,AC.sampleRate);const dd=NB.getChannelData(0);for(let i=0;i<n;i++)dd[i]=(Math.random()*2-1)*pw(1-i/n,3)}if(AC.state=='suspended')AC.resume()}catch(e){}}
+function bang(){if(!AC||AC.state!='running')return;try{const t0=AC.currentTime,s=AC.createBufferSource();s.buffer=NB;s.playbackRate.value=.85+Math.random()*.3;
+ const lpf=AC.createBiquadFilter();lpf.type='lowpass';lpf.frequency.value=2600;const g=AC.createGain();g.gain.value=.45;s.connect(lpf);lpf.connect(g);g.connect(AC.destination);s.start(t0);
+ const o=AC.createOscillator(),og=AC.createGain();o.frequency.setValueAtTime(170,t0);o.frequency.exponentialRampToValueAtTime(45,t0+.1);og.gain.setValueAtTime(.5,t0);og.gain.exponentialRampToValueAtTime(.001,t0+.13);o.connect(og);og.connect(AC.destination);o.start(t0);o.stop(t0+.14)}catch(e){}}
+// ================= BENELLI M4 (v44) =================
+// 1 tembakan = 9 butir (spread kecil), tiap butir k1 = bot langsung mati (hp -> 0). pw = pengali dorongan ragdoll. Recoil brutal: senjata terangkat & terputar, badan terdorong mundur,
+// kepala/kaki tersentak, kamera menendang, layar bergetar. Ubah angka di tabel BN untuk menyetel.
+const SMK=[]; // asap moncong
+const BN={pel:9,spread:.075,spd:41,pw:3.2,cd:.55,climb:.05,climbMax:.2,rc:.11,gvx:8,gvy:3,gvr:.05,push:6,kick:2.4,shk:13,ckx:11,cky:6.5};
+function bnEject(d){ejectShell(d);const sh=shells[shells.length-1];if(sh){sh.sh=1;sh.s=1.5;sh.vx*=1.2}gsnd('bnclack',.8)}
+function bnFlash(fl){const L=(135+Math.random()*45)*fl+24;
+ for(const [sc,col] of [[1,'rgba(255,100,20,.5)'],[.74,'rgba(255,170,55,.75)'],[.46,'rgba(255,238,170,.95)']]){const n=16,up=[],dn=[];
+  for(let i=0;i<=n;i++){const q=i/n,x=L*sc*q,w=(7+30*Math.sin(Math.min(1,q*1.25)*Math.PI*.62))*(1-q*.82)*sc;up.push([x,-w*(.75+Math.random()*.5)]);dn.push([x,w*(.75+Math.random()*.5)])}
+  ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(-6,0);for(const p of up)ctx.lineTo(p[0],p[1]);for(let i=n;i>=0;i--)ctx.lineTo(dn[i][0],dn[i][1]);ctx.closePath();ctx.fill()}
+ ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(4,0,9+7*fl,0,7);ctx.fill();
+ ctx.fillStyle='rgba(255,215,130,.9)';for(let i=0;i<9;i++){const a=(Math.random()-.5)*1.5,l=L*(.5+Math.random()*.6);ctx.beginPath();ctx.moveTo(6,-1.2);ctx.lineTo(Math.cos(a)*l,Math.sin(a)*l);ctx.lineTo(6,1.2);ctx.closePath();ctx.fill()}}
+function bnShot(d){
+ const m=Gp(...MUZ),ang=Math.atan2(d*Math.sin(gun.r),d*Math.cos(gun.r)),dx=Math.cos(ang),dy=Math.sin(ang);
+ for(let i=0;i<BN.pel;i++){const a=i?(Math.random()-.5)*2*BN.spread:0,c=Math.cos(a),sn=Math.sin(a),sp=BN.spd*(.93+Math.random()*.14),mz=i?(Math.random()-.5)*5:0;
+  bullets.push({x:m[0]+dx*3-dy*mz,y:m[1]+dy*3+dx*mz,vx:(dx*c-dy*sn)*sp,vy:(dx*sn+dy*c)*sp,l:1,z:b.z,own:!REM,w:WI,by:REM?RIGID:null,k1:1,pw:BN.pw})}
+ b.flash=1;b.kick=BN.kick;b.fz=1.6;b.climb=Math.min(BN.climbMax,(b.climb||0)+BN.climb);b.rcv=(b.rcv||0)+BN.rc;
+ gA.vx-=dx*BN.gvx;gA.vy-=dy*BN.gvx+BN.gvy;gA.vr-=d*BN.gvr;
+ b.rcT=.5;b.vx=(b.vx||0)-d*BN.push;b.hrv=(b.hrv||0)-d*.03;b.sbv=(b.sbv||0)-d*.08;b.hxv=(b.hxv||0)-d*1.6;b.hdv=(b.hdv||0)+1.4;
+ for(const F of foot){F.vx-=d*1.4;F.vy-=.6+Math.random()*.6}
+ head.vx-=d*3;head.vy-=1;
+ if(!REM){shk=Math.max(shk,BN.shk);CK.x-=d*BN.ckx;CK.y-=BN.cky;vibShot();vib([55,25,35])}
+ b.ejT=.11; // selongsong terlempar setelah bolt bergerak (semi-auto), bukan saat tembakan
+ for(let i=0;i<12;i++){const sp=2+Math.random()*5.5;SMK.push({x:m[0]+dx*(4+i*2),y:m[1]+dy*(4+i*2),vx:dx*sp+(Math.random()-.5)*1.2,vy:dy*sp-.15-Math.random()*.5,r:5+Math.random()*7,gr:.5+Math.random()*.5,l:1,a:.22+Math.random()*.16,c:i<4?'#bdb6aa':'#8c8c92'})}
+ puff(b.x+d*40,b.z);puff(b.x-d*20,b.z);nbang()}
+function shoot(d){cd=WI==1?.17:WI==2?.075:WI==3?BN.cd:.085;ammo--;updAmmo();
+ if(WI==3)return bnShot(d);
+ const m=Gp(...MUZ),dx=d*Math.cos(gun.r),dy=d*Math.sin(gun.r),a=(Math.random()-.5)*(.03+(b.climb||0)*.22),c=Math.cos(a),sn=Math.sin(a);
+ bullets.push({x:m[0],y:m[1],vx:(dx*c-dy*sn)*40,vy:(dx*sn+dy*c)*40,l:1,z:b.z,own:!REM,w:WI,by:REM?RIGID:null});
+ b.flash=1;b.kick=1;b.fz=1;b.climb=Math.min(.12,(b.climb||0)+.011+Math.random()*.007);if(!REM){shk=Math.max(shk,2.6);CK.x-=d*2.4;CK.y-=1.3;vibShot()}
+ gA.vx-=dx*3.6;gA.vy-=dy*3.6+1.1;gA.vr-=d*.05*(.6+Math.random()*.8);
+ if(WI==1){b.slt=0;if(ammo<=0)b.slLock=1;ejectShell(d);gA.vr-=d*.06;gA.vy-=1;b.climb=Math.min(.14,(b.climb||0)+.014);gbang()}else if(WI==2){ejectShell(d);gA.vr-=d*.02;mbang()}else abang()}
+
+// ================= PISAU (v21) =================
+// Tombol PISAU (kiri tombol RELOAD): simpan senjata api ke punggung -> tangan ambil pisau dari pinggang -> joystick bidik berganti tombol SERANG.
+// Semua animasi memakai keyframe + interpolasi Catmull-Rom (hm) supaya mulus. Ubah angka di tabel KNF untuk menyetel gaya.
+const FHX=.55; // posisi tangan nganggur di sisi depan (pecahan lebar badan dari tengah; .5 = pas di tepi badan, makin kecil makin tertutup badan)
+const KR=[64,-.62,-.55,0,0,40,-.50]; // pose siap: [x, y(pecahan tinggi badan), sudut pisau (+ = ujung turun), condong badan, dorongan maju, tangan bebas x, tangan bebas y]
+const KNF={W:124,H:36,g:[.2,.46],tip:[.97,.43],guard:[.42,.46],
+ sl:[-30,-.74,-1.95],      // posisi senjata api di punggung: [x belakang, y (pecahan tinggi badan), sudut]
+ T1:1.15,T2:1.05,
+ // ganti senjata api -> pisau: [waktu,[x, y, sudut, skala pisau]]
+ K1:[[.62,[30,-.36,1.5,0]],[.68,[30,-.36,1.5,1]],[.78,[30,-.40,1.4,1]],[.86,[46,-.52,.5,1]],[.95,[68,-.64,-.9,1]],[1.05,[63,-.62,-.5,1]],[1.15,[64,-.62,-.55,1]]],
+ // pisau -> senjata api
+ K2:[[0,[64,-.62,-.55,1]],[.12,[62,-.58,-.3,1]],[.26,[42,-.46,.9,1]],[.38,[30,-.36,1.5,1]],[.46,[30,-.36,1.5,0]]],
+ // 3 gerakan kombo: T=durasi, C=boleh disambung serangan berikut setelah detik ini, W=waktu bunyi sabetan, H=jendela kena
+ S:[
+  {T:.95,C:.58,W:.24,H:[.27,.41],K:[[0,KR],[.13,[16,-.84,-1.9,-.12,-5,66,-.55]],[.22,[4,-.89,-2.15,-.14,-6,70,-.57]],[.30,[78,-.72,-.35,.05,6,48,-.50]],[.37,[118,-.42,1.15,.20,16,12,-.42]],[.50,[126,-.36,1.45,.22,18,8,-.40]],[.74,[96,-.55,.30,.08,7,30,-.46]],[.95,KR]]},
+  {T:.92,C:.56,W:.23,H:[.26,.39],K:[[0,KR],[.12,[26,-.36,1.35,.08,-4,62,-.55]],[.20,[20,-.34,1.5,.10,-5,66,-.56]],[.29,[84,-.55,.5,0,6,44,-.50]],[.36,[118,-.88,-1.1,-.06,14,14,-.44]],[.48,[124,-.95,-1.4,-.08,16,10,-.44]],[.72,[92,-.72,-.9,0,6,30,-.48]],[.92,KR]]},
+  {T:.92,C:.56,W:.27,H:[.28,.40],K:[[0,KR],[.14,[16,-.60,-.25,-.10,-6,50,-.50]],[.22,[6,-.60,-.2,-.12,-8,54,-.50]],[.30,[138,-.58,.02,.14,18,18,-.46]],[.36,[150,-.57,.05,.16,22,12,-.45]],[.52,[140,-.58,0,.12,17,16,-.46]],[.78,[92,-.62,-.4,.04,6,34,-.48]],[.92,KR]]}]};
+const wrapA=a=>{a%=6.2832;return a>3.1416?a-6.2832:a<-3.1416?a+6.2832:a};
+const evK=(K,t)=>{const v=hm(K,t);v[1]*=BHt;if(v.length>6)v[6]*=BHt;return v};
+// bunyi sintetis: sabetan (desis cepat), tarik pisau (shing logam), simpan (klak)
+const KSA=[1,2,3,4,5,6,7].map(i=>{const a=new Audio('Sound/knife'+i+'.mp3');a.preload='auto';return a}),KSB=[];let KSL=0;
+function kload(){if(KSL||!AC)return;KSL=1;for(let i=1;i<=7;i++)fetch('Sound/knife'+i+'.mp3').then(r=>r.arrayBuffer()).then(x=>AC.decodeAudioData(x)).then(x=>{KSB[i-1]=x}).catch(()=>{})}
+let KSLAST=-1;
+function khit(){let i;do{i=Math.random()*7|0}while(i==KSLAST);KSLAST=i;try{if(AC&&KSB[i]&&AC.state=='running'){const s=AC.createBufferSource(),g=AC.createGain();s.buffer=KSB[i];s.playbackRate.value=.94+Math.random()*.12;g.gain.value=.9;s.connect(g);g.connect(AC.destination);s.start()}else{const a=KSA[i];a.currentTime=0;a.play().catch(()=>{})}}catch(e){}}
+function ksnd(k){if(k=='hit')return khit();if(!AC||AC.state!='running'||!NB)return;try{const t0=AC.currentTime;
+ if(k=='swoosh'){const s=AC.createBufferSource();s.buffer=NB;s.playbackRate.value=1.3+Math.random()*.4;const bp=AC.createBiquadFilter();bp.type='bandpass';bp.Q.value=1.1;bp.frequency.setValueAtTime(500,t0);bp.frequency.exponentialRampToValueAtTime(2800,t0+.15);
+  const g=AC.createGain();g.gain.setValueAtTime(.0001,t0);g.gain.exponentialRampToValueAtTime(.55,t0+.04);g.gain.exponentialRampToValueAtTime(.001,t0+.2);s.connect(bp);bp.connect(g);g.connect(AC.destination);s.start(t0)}
+ else if(k=='shing'){for(const [fq,v,dd] of [[3300,.07,.34],[4900,.045,.26],[6700,.03,.2]]){const o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.setValueAtTime(fq*.92,t0);o.frequency.exponentialRampToValueAtTime(fq,t0+.05);g.gain.setValueAtTime(v,t0);g.gain.exponentialRampToValueAtTime(.0005,t0+dd);o.connect(g);g.connect(AC.destination);o.start(t0);o.stop(t0+dd+.02)}
+  const s=AC.createBufferSource();s.buffer=NB;s.playbackRate.value=2.2;const hp=AC.createBiquadFilter();hp.type='highpass';hp.frequency.value=4200;const g2=AC.createGain();g2.gain.value=.22;s.connect(hp);hp.connect(g2);g2.connect(AC.destination);s.start(t0)}
+ else{const s=AC.createBufferSource();s.buffer=NB;s.playbackRate.value=1.6;const lp2=AC.createBiquadFilter();lp2.type='lowpass';lp2.frequency.value=1100;const g=AC.createGain();g.gain.value=.32;s.connect(lp2);lp2.connect(g);g.connect(AC.destination);s.start(t0);
+  const o=AC.createOscillator(),og=AC.createGain();o.frequency.setValueAtTime(220,t0);o.frequency.exponentialRampToValueAtTime(70,t0+.06);og.gain.setValueAtTime(.3,t0);og.gain.exponentialRampToValueAtTime(.001,t0+.08);o.connect(og);og.connect(AC.destination);o.start(t0);o.stop(t0+.09)}}catch(e){}}
+function knifeAtk(){if(ME.dead||b.fn||!b.wm||b.wt>=0)return;b.kq=1;b.kqt=.5;window.NET&&NET.ev('katk')}
+function toggleKnife(){if(ME.dead||b.fn||b.rl>=0||b.sw>=0||b.wt>=0)return;const to=b.wm?0:1;b.wto=to;b.wt=0;b.ck=-1;b.sl=-1;b.kq=0;b.katk=0;b.kfl=-1;b.gsi=0;ax=ay=0;fireS=false;vib(10);setKnifeUi(to==1)}
+// bagian 1 (dalam step, sebelum badan): jam ganti senjata + ayunan -> hitung pose pisau, condong badan, dorongan maju
+function knifeStep(f,d,sc){
+ if(!(b.wm||b.wt>=0)){b.kg=0;b.kw1=0;b.kw0=0;b.ks=0;b.kLean=b.kLunge=b.kHx=b.kHy=0;return}
+ const dt=f/60,sg2=sg;let g=0,w1=0,w0=0,K,V;
+ if(b.khs>0)b.khs-=dt;const sdt=b.khs>0?.1:1;
+ if(b.wt>=0){const o=b.wt,t=b.wt+=dt,fw=b.wto==1;
+  if(!REM){if(fw&&o<.62&&t>=.62)ksnd('shing');if(fw&&o<.42&&t>=.42)ksnd('clack');if(!fw&&o<.4&&t>=.4)ksnd('clack');if(!fw&&o<.62&&t>=.62)ksnd('shing')}
+  if(fw){g=sg(t,.04,.5);w1=sg(t,.36,.62);w0=sg(t,.26,.5);K=evK(KNF.K1,t)}
+  else{g=1-sg(t,.52,1);w1=1-sg(t,.44,.62);w0=1-sg(t,.78,1);K=evK(KNF.K2,t)}
+  V=[KR[0],KR[1]*BHt,KR[2],0,0,KR[5],KR[6]*BHt];
+  if(t>=(fw?KNF.T1:KNF.T2)){b.wt=-1;b.wm=b.wto?1:0;if(!b.wm){b.gsi=0}}
+  b.kcur=V.slice()}
+ else{g=1;w1=1;w0=1;
+  const rdy=[KR[0],KR[1]*BHt,KR[2],0,0,KR[5],KR[6]*BHt];
+  if(b.kq){b.kqt-=dt;if(b.kqt<=0)b.kq=0}
+  const startSw=()=>{const idx=b.kcmb||0,S=KNF.S[idx],T0=evK(S.K,0),cur=b.kcur||rdy;b.kof=cur.map((v,i)=>v-T0[i]);b.kof[2]=wrapA(b.kof[2]);b.kot=0;b.sl=0;b.sc=idx;b.kcmb=(idx+1)%3;b.kh=new Set();b.kq=0;b.kfl=-1;b.kid=0;b.sfx=0;if(!REM)vib(8)};
+  if(b.sl>=0){const S=KNF.S[b.sc],o=b.sl;b.sl+=dt*sdt;
+   if(!REM&&o<S.W&&b.sl>=S.W){ksnd('swoosh')}
+   if((b.kq||b.katk)&&b.sl>=S.C)startSw();
+   else if(b.sl>=S.T){b.sl=-1;b.kcd=0}}
+  else if(b.kq||b.katk)startSw();
+  if(b.sl<0){b.kcd=(b.kcd||0)+dt;if(b.kcd>1.2)b.kcmb=0}
+  V=b.sl>=0?evK(KNF.S[b.sc].K,b.sl):rdy.slice();
+  if(b.kof){b.kot+=dt;const e=Math.exp(-b.kot*10);if(e<.01)b.kof=null;else for(let i=0;i<7;i++)V[i]+=b.kof[i]*e}
+  // pamer pisau saat diam: putar pisau di tangan tiap beberapa detik
+  if(b.sl<0&&sc<.3&&!b.fn){b.kid=(b.kid||0)+dt;if(b.kfl<0&&b.kid>(b.kidT||(b.kidT=4+Math.random()*4))){b.kfl=0;b.kid=0;b.kidT=5+Math.random()*5}}else if(b.sl>=0)b.kfl=-1;else b.kid=0;
+  if(b.kfl>=0){b.kfl+=dt;const u=cl(b.kfl/.8,0,1),e=u*u*(3-2*u);V[2]+=6.2832*e;V[1]-=Math.sin(Math.PI*u)*9;V[0]+=Math.sin(Math.PI*u)*5;if(b.kfl>=.8)b.kfl=-1}
+  K=[V[0],V[1],V[2],1];b.kcur=V.slice()}
+ // gerak halus saat berjalan / bernapas (selalu ditambahkan -> tidak ada loncatan di akhir animasi)
+ const ps=Math.sin(b.ph),br=Math.sin(b.br),am=b.sl>=0?.5:1;
+ K[0]+=ps*3*sc*am;K[1]+=(br*1.3-Math.cos(b.ph*2-.7)*1.4*sc)*am;K[2]+=(ps*.07*sc+br*.012)*am;
+ V=V.slice();V[5]+=-ps*9*sc*am;V[6]+=-br*1.1*am;
+ b.kg=g;b.kw1=w1;b.kw0=w0;b.ks=K[3];b.kK=K;b.kF=[V[5],V[6]];{const fl=b.fn?(b.fnL||0):0;b.kLean=V[3]+fl;b.kLunge=V[4];b.kHx=(V[3]+fl)*40;b.kHy=(V[3]+fl)*9+(b.fkn||0)*6}b.fr=d*(.22+br*.03-ps*.05*sc)}
+// bagian 2 (dalam step, setelah senjata & tangan dihitung): letakkan senjata di punggung, tangan, pisau, tebasan, trail, kena musuh
+function knifeApply(d,sc,f,TX,TY,TR){
+ if(b.ktr)for(let i=b.ktr.length-1;i>=0;i--){b.ktr[i].l-=.12*f;if(b.ktr[i].l<=0)b.ktr.splice(i,1)}
+ if(!(b.wm||b.wt>=0))return;
+ const l1=r=>1-pw(r,f),sx=cl(b.t,-1,1),LP=(x,y)=>Bp(...Sp(sx*x,y)),g=b.kg,w1=b.kw1,w0=b.kw0,K=b.kK;
+ // senjata api di punggung (digambar di belakang badan)
+ {const SLP=(b.gw|0)==1?[-26,-.46,-1.7]:KNF.sl,q=LP(SLP[0],SLP[1]*BHt),tr=d*SLP[2]+Math.sin(b.ph*2)*.03*sc*d+TR*.6,tx=q[0]+TX*.3,ty=q[1]+TY*.3-(1+Math.cos(b.ph*2))*.5*1.4*sc;
+  if(!b.gsi){b.gp={x:tx,y:ty,r:tr};b.gsi=1}else{const k=l1(.8);b.gp.x+=(tx-b.gp.x)*k;b.gp.y+=(ty-b.gp.y)*k;b.gp.r+=(tr-b.gp.r)*k}
+  gun.x=lp(gun.x,b.gp.x,g);gun.y=lp(gun.y,b.gp.y,g);gun.r=lp(gun.r,b.gp.r,g)}
+ // tangan yang memegang pistol-grip / pisau, tangan bebas
+ const gw=Gp(...GRIPH),kp=LP(K[0],K[1]),tm2=(b.tm||0);
+ hand[1].x=lp(gw[0],kp[0]+TX*.35,w1);hand[1].y=lp(gw[1],kp[1]+TY*.35,w1);hand[1].vx=hand[1].vy=0;
+ const fp=LP(Bw*FHX+b.kLunge*.12+Math.sin(b.ph)*3*sc,-.46*BHt+(b.kF[1]+.5*BHt)*.6);hand[0].x=lp(hand[0].x,fp[0]+TX*.3,w0);hand[0].y=lp(hand[0].y,fp[1]+TY*.3,w0);hand[0].vx=hand[0].vy=0;
+ if(w0>.5)b.supSpr='Fist';
+ b.mm=0;b.behind=false;b.h1s=w1>.5?'Fist':'Grip';b.kR=d*K[2];b.fr=d*.12-d*b.kLean*.8;
+ // ---- tebasan: posisi ujung & pangkal bilah, trail, kena musuh
+ if(b.sl>=0&&b.wt<0){const S=KNF.S[b.sc],R=b.kR,c=Math.cos(R),sn=Math.sin(R),W=KNF.W,H=KNF.H,
+   tl=[(KNF.tip[0]-KNF.g[0])*W*d,(KNF.tip[1]-KNF.g[1])*H],gl=[(KNF.guard[0]-KNF.g[0])*W*d,0],ml=[(KNF.guard[0]+.45*(KNF.tip[0]-KNF.guard[0])-KNF.g[0])*W*d,0],
+   P=(l)=>[hand[1].x+l[0]*c-l[1]*sn,hand[1].y+l[0]*sn+l[1]*c],tip=P(tl),bs=P(gl),md=P(ml),pv=b.ktp||tip;b.ktp=tip;
+  if(b.sl>S.H[0]-.07&&b.sl<S.H[1]+.12){(b.ktr||(b.ktr=[])).push({tx:tip[0],ty:tip[1],mx:md[0],my:md[1],l:1});if(b.ktr.length>16)b.ktr.shift()}
+  if(!REM&&b.sl>=S.H[0]&&b.sl<=S.H[1]){const tvx=tip[0]-pv[0],tvy=tip[1]-pv[1],tv=Math.hypot(tvx,tvy)||1,ux0=d*.85+tvx/tv*.15,uy0=tvy/tv*.45,ul=Math.hypot(ux0,uy0);
+   const q={vx:ux0/ul*10,vy:uy0/ul*10},rx=HRX()*1.08,ry=HRY()*1.08;let hit=0;
+   for(const T of targetList()){if(!T.bot||b.kh.has(T.id)||Math.abs(T.R.b.z-b.z)>36)continue;
+    for(const sg3 of [[bs,tip],[pv,tip]]){const a=sg3[0],e=sg3[1],th=segEll(a[0],a[1],e[0],e[1],T.hx,T.hy,rx,ry,T.ang),tb=segRect(a[0],a[1],e[0],e[1],T.bx,T.by,T.ang,-Bw*.46,-BHt,Bw*.46,FHt*.3);
+     let tt=-1,part='';if(th>=0&&(tb<0||th<=tb+.03)){tt=th;part='h'}else if(tb>=0){tt=tb;part='b'}
+     if(tt>=0){const hx=a[0]+(e[0]-a[0])*tt,hy=a[1]+(e[1]-a[1])*tt;b.kh.add(T.id);KNH=b.sc==2?2:1;KDX=tvx/tv;KDY=tvy/tv;botHit(T.bot,q,part,hx,hy);KNH=0;hit=1;break}}}
+   for(const cc of corpses){if(b.kh.has(cc)||Math.abs(cc.gy-b.z)>44)continue;const r=corpseHit(cc,bs[0],bs[1],tip[0],tip[1])||corpseHit(cc,pv[0],pv[1],tip[0],tip[1]);
+    if(r){const a=bs,e=tip,hx=a[0]+(e[0]-a[0])*r.t,hy=a[1]+(e[1]-a[1])*r.t;b.kh.add(cc);KNH=b.sc==2?2:1;KDX=tvx/tv;KDY=tvy/tv;corpseShot(cc,r.part,hx,hy,q);KNH=0;hit=1}}
+   if(hit){b.khs=.075;shk=Math.max(shk,3.4);CK.x+=d*3.2;CK.y+=.6;ksnd('hit');vib(22)}}
+ }else b.ktp=null}
+function drawKnife(d){const s=b.ks,W=KNF.W,H=KNF.H;ctx.save();ctx.translate(hand[1].x,hand[1].y);ctx.rotate(b.kR||0);ctx.scale(d*s,s);ctx.drawImage(stnImg(b,'k',b.kBl?knifeBlood():IM.Knife),-W*KNF.g[0],-H*KNF.g[1],W,H);ctx.restore()}
+// jejak tebasan: pita putih tipis yang memudar mengikuti ujung bilah
+function drawKTrail(){const T=b.ktr;if(!T||T.length<2)return;ctx.save();ctx.globalCompositeOperation='lighter';
+ for(let i=1;i<T.length;i++){const a=T[i-1],c=T[i],al=Math.min(a.l,c.l);if(al<=0)continue;
+  ctx.fillStyle='rgba(255,236,205,'+(al*al*.38)+')';ctx.beginPath();ctx.moveTo(a.tx,a.ty);ctx.lineTo(c.tx,c.ty);ctx.lineTo(c.mx,c.my);ctx.lineTo(a.mx,a.my);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,'+(al*.85)+')';ctx.lineWidth=2.2*al+.4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(a.tx,a.ty);ctx.lineTo(c.tx,c.ty);ctx.stroke()}
+ ctx.restore()}
+function step(f){
+ useW(b.gw|0);
+ if(b.fn&&!REM)finPre(f);
+ const l1=r=>1-pw(r,f);
+ b.vx+=(mx*4.6-b.vx)*l1(.72);b.vz+=(my*3.4-b.vz)*l1(.72);b.x=cl(b.x+b.vx*f,-RW+60,RW-60);b.z=cl(b.z+b.vz*f,ZMIN,ZMAX);
+ const s=Math.hypot(b.vx,b.vz),sc=Math.min(1,s/4),sh=Math.max(s,1);
+ const aa=Math.hypot(ax,ay)>.25,dlk=b.sl>=0||b.wt>=0||b.fn;if(dlk){}else if(aa){if(Math.abs(ax)>.2)b.dir=ax>0?1:-1}else if(Math.abs(b.vx)>.3&&!(b.rcT>0))b.dir=b.vx>0?1:-1;const d=b.dir;b.t+=(d-b.t)*l1(.8);
+ b.ph+=s*.052*f;b.br+=.045*f;b.tilt+=(b.vx*.022-b.tilt)*l1(.75);
+ const st=Math.floor(b.ph/Math.PI);if(st!=b.lastStep){b.lastStep=st;if(s>1.8){b.hdv=(b.hdv||0)+.8*sc;b.sbv=(b.sbv||0)+d*.012*sc}if(s>1.8)for(let k=0;k<3;k++)dust.push({x:b.x-d*10+(Math.random()-.5)*14,y:b.z-2,vx:-b.vx*.15+(Math.random()-.5)*.8,vy:-.3-Math.random()*.5,l:1})}
+ // ---- animasi ganti safety
+ if(b.sw>=0&&b.swG!=null){b.sw+=f/60; // ganti senjata api: turunkan (pose siaga) -> tukar sprite -> angkat lagi
+  if(!b.swd&&b.sw>=.3){b.swd=1;setGun(b.swG)}
+  if(b.sw>=.34&&b.safe)b.safe=false;
+  if(b.sw>=.78){b.sw=-1;b.swG=null;b.safe=false}}
+ else if(b.sw>=0){b.sw+=f/60;
+  if(!b.swd&&b.sw>=SW_FLIP){b.swd=1;b.fsafe=!!b.swTo;if(!REM){ax=ay=0;fireS=false;applySafeUi()}}
+  if(b.sw>=(b.swTo?SW_ON:SW_OFF)){b.sw=-1;b.fsafe=!!b.swTo;if(!REM){applySafeUi()}}}
+ // ---- diam 10-15 dtk -> animasi cek magazen (mengikuti video); batal kalau bergerak/membidik/menembak/reload/safety
+ {const sp=Math.hypot(mx,my),still=sp<.08&&Math.hypot(ax,ay)<.25&&!fireS&&!(!REM&&(KY.Space||KY.KeyF))&&Math.hypot(b.vx,b.vz)<.6;
+  const busy=b.rl>=0||b.safe||b.sw>=0||frz||b.wm||b.wt>=0;
+  if(b.ck>=0){const abort=busy||sp>.15||Math.hypot(ax,ay)>=.25||fireS||(!REM&&(KY.Space||KY.KeyF));
+   if(abort){b.ck=-1;b.idle=0}else{b.ck+=f/60;if(b.ck>=CK_T){b.ck=-1;b.idle=0;b.idleT=10+Math.random()*5}}}
+  else if(!busy&&still&&(b.gw|0)!=1){b.idle=(b.idle||0)+f/60;if(b.idle>=(b.idleT||(b.idleT=10+Math.random()*5))){b.ck=0;if(!REM)playSnd(2)}}
+  else b.idle=0}
+ // ---- waktu reload (detik, sinkron dengan suara) - tergantung mode (b.rm)
+ let t=-1;const M=RM[b.rm|0];if(b.rl>=0){const o=b.rl;if(!frz)b.rl+=f/60*RS;t=b.rl;
+  for(const e of M.ev)if(o<e[0]&&t>=e[0]){gA.vy+=e[1];gA.vr+=d*e[2];if(e[3])vib(e[3])}
+  if(M.snd&&!REM)for(const e of M.snd)if(o<e[0]&&t>=e[0])gsnd(e[1]);
+  if(b.rm==4&&o<1.8&&t>=1.8)b.slLock=0;
+  const st=M.sfxT-sfxLead();if(!REM&&o<st&&t>=st)playSfx(b.rm|0);
+  if(o<M.ammoT&&t>=M.ammoT){ammo=MAGN;updAmmo()}
+  if(t>=M.RT){b.rl=-1;t=-1}}
+ let tl=[0,0,0];if(t>=0)tl=hm(M.TL,t);
+ // ---- bidik (ngeker): senjata diangkat, kepala condong ke sight, napas tertahan -> makin stabil; getar tangan saat pegang senjata
+ const aimOn=aa&&!b.safe&&!(b.sw>=0)&&t<0&&!frz,ak0=b.aimk||0;b.aimk=ak0+((aimOn?1:0)-ak0)*l1(.86);
+ b.ah=aimOn?(b.ah||0)+f/60:0;{const fk0=b.fk||0,ft=(aimOn&&(cd>0||(b.fz||0)>.12))?1:0;b.fk=fk0+(ft-fk0)*(ft?l1(.8):l1(.93))}const ST=sg(b.ah,.25,1.2),av=b.aimk-ak0;if(Math.abs(av)>.001)gA.vy-=av*6;
+ b.tm=(b.tm||Math.random()*40)+f/60;
+ let AMP=.95+.8*b.aimk*(1-ST*.65)+.6*sc+(b.fz||0)*1.6;if(b.safe)AMP*=.45;if(t>=0)AMP*=.5;
+ const tm=b.tm,TX=AMP*(Math.sin(tm*18.3)*.5+Math.sin(tm*31.7+1.3)*.3+Math.sin(tm*7.1+.4)*.6),TY=AMP*(Math.sin(tm*22.9+.8)*.4+Math.sin(tm*37.1)*.25+Math.sin(tm*5.3+2)*.6),TR=AMP*.0045*(Math.sin(tm*14.1)+.6*Math.sin(tm*26.3+1));
+ knifeStep(f,d,sc);
+ // ---- badan
+ const bob=(1+Math.cos(b.ph*2))*.5*3.6*sc,breath=Math.sin(b.br)*1.4;
+ // reaksi kena tembak (bot): pegas teredam -> badan miring & bergetar, lalu kembali tegak
+ {const hr=b.hr||0,hv=b.hrv||0,xo=b.hxo||0,xv=b.hxv||0,dp=b.hdp||0,dv=b.hdv||0,G=b.dyg;
+  if(G){ // TEWAS: lutut lemas (badan turun), badan rebah makin cepat ke arah tembakan, badan atas menekuk lebih lambat dari pinggul
+   const T=b.dyt||0;b.hrv=hv+(G.ux*.0016*(1+T*2.4)-hv*.035)*f;b.hr=hr+b.hrv*f;
+   b.hxv=xv+(G.ux*.045-xv*.07)*f;b.hxo=xo+b.hxv*f;
+   b.hdv=dv+(.09*(1+T*1.5)-dv*.05)*f;b.hdp=Math.min(dp+b.hdv*f,BHt*.34)}
+  else{b.hrv=hv+(-hr*.12-hv*.05)*f;b.hr=hr+b.hrv*f;b.hxv=xv+(-xo*.16-xv*.08)*f;b.hxo=xo+b.hxv*f;b.hdv=dv+(-dp*.16-dv*.14)*f;b.hdp=dp+b.hdv*f}}
+ {const T=b.dyg?b.dyg.ux*(.2+(b.dyt||0)*.35):d*(.018*sc+.03*b.aimk+.05*(b.fk||0)+(t>=0?.035*Math.sin(Math.PI*Math.min(1,t/M.RT)):0)-Math.sin(b.ph)*.02*sc-(b.kick||0)*.05)+Math.sin(b.br)*.004+d*(b.kLean||0);
+  b.sbv=(b.sbv||0)+(-((b.sb||0)-T)*.15-(b.sbv||0)*(b.dyg?.1:.14))*f;b.sb=cl((b.sb||0)+b.sbv*f,-.55,.55)}
+ b.rot=b.tilt+Math.sin(b.ph)*.008*sc-d*tl[0]*.07+d*b.aimk*.012-d*(b.kick||0)*.012+(b.hr||0)+(b.fhr||0);b.px=b.x-d*tl[0]*7-d*(b.kick||0)*3.2+d*b.aimk*2+(b.hxo||0)+d*(b.kLunge||0);b.py=b.z-FHt*.42-bob+breath*.3+(b.hdp||0)+(b.fkn||0)*BHt*.30;
+ // ---- senjata kaku di tangan pelatuk: jangkar (gagang) di-spring, gun diturunkan dari jangkar
+ const sw=-Math.cos(b.ph*2-.7)*1.4*sc,gx0=d*(GW*(GRIPH[0]-GX)+0)+(-d*tl[2]*-1)*0;
+ const sf=b.sf=(b.sf||0)+((b.safe?1:0)-(b.sf||0))*l1(.82);
+ // titik putar: tangan belakang saat datar/atas; bergeser ke pegangan depan saat menunduk (popor terangkat)
+ b.ap=b.ap||0;const pvw=cl(b.ap/.4,0,1),PV0=lp(GRIPH[0],GRIP[0],pvw),PV1=lp(GRIPH[1],GRIP[1],pvw);
+ const base=Bp(...Sp(d*(lp(GW*PV0-Bw*.10+GXO,SAFE_X,sf)+tl[2]+Math.sin(b.ph)*1.2*sc),lp(GY*BHt+GH*(PV1-.5),SAFE_Y*BHt,sf)+breath+sw+tl[1]-(b.fk||0)*5));
+ b.ap=b.ap||0;b.ap+=((b.safe?-SAFE_ANG:aa?cl(Math.atan2(ay,Math.max(Math.abs(ax),1e-4)),-AIM_UP,AIM_DOWN):0)*(t>=0?.4:1)-b.ap)*l1(.8);
+ {const hp=b.safe?0:b.ap;b.hp=hp<-.2?-1:hp>.28?1:(Math.abs(hp)<.1?0:(b.hp||0))}
+ base[0]+=TX;base[1]+=TY;const gr=b.ap*d+b.rot+d*Math.sin(b.ph)*.02*sc-d*.03+Math.sin(b.br*.8)*.008-d*tl[0]-d*(b.climb||0)-d*(b.rc||0)+d*TR+(b.sb||0)*.8;
+ sp(gA,base[0],base[1],.42,.5,f);gA.r+=(gr-gA.r)*.32*f+gA.vr*f;gA.vr*=pw(.7,f);
+ gun.r=gA.r;{const lx=-(PV0-.5)*GW*d,ly=-(PV1-.5)*GH,c=Math.cos(gun.r),sn=Math.sin(gun.r);gun.x=gA.x+lx*c-ly*sn;gun.y=gA.y+lx*sn+ly*c}
+ const gH=Gp(...GRIPH);hand[1].x=gH[0];hand[1].y=gH[1];hand[1].vx=hand[1].vy=0;
+ cd=Math.max(0,cd-f/60);if(b.ejT>0){b.ejT-=f/60;if(b.ejT<=0&&WI==3)bnEject(d)}b.rcT=Math.max(0,(b.rcT||0)-f/60);b.rcv=(b.rcv||0)+(-.05*(b.rc||0)-.17*(b.rcv||0))*f;b.rc=(b.rc||0)+b.rcv*f;b.flash=Math.max(0,(b.flash||0)-f*.28);b.kick=(b.kick||0)*pw(.8,f);shk*=pw(.82,f);b.fz=(b.fz||0)*pw(.8,f);b.climb=(b.climb||0)*pw(.965,f);
+ if((fireS||(!REM&&(KY.Space||KY.KeyF)))&&!b.safe&&!b.fsafe&&!(b.sw>=0)&&t<0&&cd<=0&&!frz&&!b.wm&&!(b.wt>=0)){if(ammo>0)shoot(d);else reload()}
+ // ---- tangan penyangga (diam kaku di handguard saat jalan; saat reload ikut jalur video)
+ let tg=Gp(...HGUARD),supSpr='Cup',mm=0;
+ if(t>=0&&!(b.rm|0)){
+  const mh=Gp(...MAGH),hg=Gp(...HGUARD),c1=Gp(...CHF),c0=Gp(...CHB);
+  const pbk=Bp(d*22,-BHt*.3),pm=Bp(d*72,-BHt*.33),pe=Bp(d*106,-BHt*.37),cf=[c1[0]+d*8,c1[1]-4];
+  const K2=[[0,hg],[.22,[mh[0]-d*2,mh[1]+30]],[.3,mh],[.38,[mh[0]+d*8,mh[1]+16]],[.44,[mh[0]+d*16,mh[1]+30]],[.5,[lp(mh[0]+d*16,pbk[0],.5),lp(mh[1]+30,pbk[1],.5)]],[.56,pbk],[.62,pbk],[.69,pm],[.74,pe],[.82,[mh[0]+d*3,mh[1]+14]],[.9,[mh[0]+d*3,mh[1]+2]],[1.0,[mh[0]-d,mh[1]+4]],[1.1,mh],[1.2,[mh[0]+d*6,mh[1]+20]],[1.3,cf],[1.4,c1],[1.5,c1],[1.62,c0],[1.72,c0],[1.8,c1],[1.9,[lp(c1[0],hg[0],.5),lp(c1[1],hg[1],.5)]],[2.05,[hg[0],hg[1]+6]],[2.2,hg],[RT,hg]];
+  tg=hm(K2,t);
+  mm=t<.3?0:t<.48?1:t<.6?2:t<1.1?3:4;supSpr=(mm==1||mm==3)?'Mag':mm==4?(t<1.9?'Fist':'Cup'):'Cup';
+  if(t>=.48&&!b.dropped){b.dropped=1;const gm=Gp(...MAGC);
+   WI!=3&&drops.push({x:hand[0].x+(gm[0]-mh[0]),y:hand[0].y+(gm[1]-mh[1]),vx:d*2.4,vy:-1.2,r:b.mr||d*.14,vr:d*.16,l:1,d:d,gy:b.z-4,im:MIM,w:MW,h:MH})}
+ }else if(t>=0){const R=modeRun(b.rm|0,t,d),M2=RM[b.rm|0];tg=R.tg;supSpr=R.sp;mm=10;b.gm=R.gm;b.hd=R.hd;
+  if(R.h1){hand[1].x=R.h1[0];hand[1].y=R.h1[1]}b.h1s=R.h1s;
+  if(M2.drop>=0&&t>=M2.drop&&!b.dropped){b.dropped=1;const gm=Gp(...MAGC),mh=Gp(...MAGH);WI!=3&&drops.push({x:hand[0].x+(gm[0]-mh[0]),y:hand[0].y+(gm[1]-mh[1]),vx:b.rm==4?-d*(.3+Math.random()*.5):d*(1.2+Math.random()*1.4),vy:b.rm==4?-.3-Math.random()*.5:-1.2-Math.random()*1.2,r:b.mr||d*.14,vr:d*.16,l:1,d:d,gy:b.z-4,im:MIM,w:MW,h:MH})}
+ }else{b.dropped=0;b.h1s='Grip'}
+ if(b.sw>=0&&t<0&&b.swG==null&&(b.gw|0)!=1){const hg=Gp(...HGUARD),S0=Gp(...SEL),c1=Gp(...CHF),c0=Gp(...CHB),sx=S0[0],sy=S0[1],cx=c1[0],cy=c1[1],mid=(a,c)=>[lp(a[0],c[0],.5),lp(a[1],c[1],.5)];
+  const KS=b.swTo?[[0,hg],[.2,hg],[.4,[sx+d*4,sy-8]],[.5,[sx,sy-2]],[.58,[sx-d*3,sy+3]],[.66,[sx,sy-2]],[.8,mid([sx,sy],hg)],[.95,hg]]
+   :[[0,hg],[.28,hg],[.48,[sx+d*4,sy-8]],[.54,[sx,sy-2]],[.62,[sx-d*3,sy+3]],[.7,[sx,sy-2]],[.85,[cx+d*8,cy-4]],[.92,c1],[1.0,c0],[1.1,c0],[1.18,c1],[1.26,c1],[1.4,mid(c1,hg)],[1.56,hg],[1.72,hg]];
+  tg=hm(KS,b.sw);supSpr=(!b.swTo&&b.sw>.9&&b.sw<1.28)?'Fist':'Cup'}
+ if(b.ck>=0&&t<0&&!(b.sw>=0)){const hg=Gp(...HGUARD),mh=Gp(...MAGH),top=Gp(...CKT),T=b.ck,dn=(x,y)=>[mh[0]+d*x,mh[1]+y];
+  tg=hm([[0,hg],[.1,dn(-2,26)],[.22,mh],[.4,dn(10,24)],[.55,dn(14,34)],[.78,top],[1.0,[top[0],top[1]-2]],[1.3,top],[1.45,dn(10,28)],[1.62,dn(3,14)],[1.78,dn(0,3)],[1.86,mh],[1.95,dn(2,14)],[2.2,hg],[2.5,hg]],T);
+  b.ckr=hm([[0,[gun.r]],[.14,[gun.r]],[.3,[d*.14]],[.6,[d*.14]],[.8,[d*-1.3]],[1.3,[d*-1.3]],[1.5,[d*.14]],[1.72,[d*.14]],[1.8,[gun.r]],[2.5,[gun.r]]],T)[0];
+  mm=(T>=.14&&T<1.8)?1:0;supSpr=(T>=.08&&T<1.95)?'Mag':'Cup'}
+ {const hg0=Gp(...HGUARD),sc=t>=0||b.sw>=0||b.ck>=0;let o=sc?[tg[0]-hg0[0],tg[1]-hg0[1]]:(b.lo||[0,0]);if(sc)b.lo=o;
+  b.hw=(b.hw||0)+((sc?1:0)-(b.hw||0))*l1(sc?.6:.72);tg=[hg0[0]+o[0]*b.hw,hg0[1]+o[1]*b.hw]}
+ hand[0].x=tg[0];hand[0].y=tg[1];hand[0].vx=hand[0].vy=0;
+ b.supSpr=supSpr;b.mm=mm;b.rl2=t;b.behind=!(b.rm|0)&&t>=.46&&t<.74;
+ if((b.gw|0)==1){const T=(b.slt==null?9:b.slt)+f/60;b.slt=T;const rc=T<.03?T/.03:1-sg(T,.03,.125);b.sld=Math.max(rc>0?rc:0,b.slLock?.86:0,t>=0&&b.rm==4?(b.slr||0):0)}else b.sld=0;
+ knifeApply(d,sc,f,TX,TY,TR);
+ if(b.fn&&!REM)finPost(d,f);
+ const sx=cl(b.t*2.5,-1,1);
+ [0,1].forEach(i=>{const o=i*Math.PI,F=foot[i];
+  const G=gait(b.ph+o),gx=b.x+FXn[i]*sx+G[0]*24*sc*(b.vx/sh)+d*(b.kLunge||0)*(i?.35:1.1)-d*(b.fkn||0)*(i?22:-10),gy=b.z-FHt/2-G[1]*10*sc+(b.vz/sh)*G[0]*9*sc;
+  sp(F,gx,gy,.42,.52,f);F.y=Math.min(F.y,b.z-FHt/2);F.r=lp(F.r||0,G[2]*sc,.35)});
+ const hd=Bp(...Sp(b.t*14-b.vx*.6+d*b.aimk*(3.5+1.5*ST)+d*(b.fk||0)*9-d*(b.kick||0)*1.2+d*(b.kHx||0),-BHt-HU+breath*.6+(b.kHy||0)-(1+Math.cos(b.ph*2))*.5*1.1*sc+b.aimk*1.6+(b.fk||0)*7+(b.kick||0)*.8));sp(head,hd[0],hd[1],.3,.58,f);b.hx=head.x-hd[0]}
+// ================= GOROK (v28) =================
+// Pakai pisau + dekat mayat tergeletak -> tombol serang kuning berdenyut. Tahan ~1 detik: karakter berlutut, tangan kiri menjambak kepala & mengangkatnya,
+// pisau menggorok dari bawah ke atas (tertutup kepala), kepala putus, diangkat sebentar lalu dijatuhkan.
+// Setel di tabel FG: HOLD=lama tahan, R=jarak aktif, A/L0/L1/C0/C1/H1/D0/T=pembagian waktu (detik), F=kecepatan gesek, OFF=jarak berdiri, LIFT=tinggi angkat kepala
+const FG={HOLD:1,R:200,A:.6,L0:.6,L1:1.6,C0:1.7,C1:3.6,H1:4.9,D0:5.2,T:6,F:1.6,OFF:240,LIFT:84};
+const FIN={t:-1,c:null,d:1,tx:0,tz:0,ok:null,hold:0,on:false,cls:false,sn:-1,h0:null,pool:0,pu:0,gush:0};
+function finTarget(){if(REM||ME.dead||!b.wm||b.wt>=0||FIN.t>=0)return null;let best=null,bd=1e9;
+ for(const c of corpses){if(c.fo||c.slit||c.age<20||!c.touch||Math.abs(Math.sin(c.a))<.5||Math.abs(c.vx)>1.5||Math.abs(c.vy)>2)continue;
+  const nk=up(c,0,-BHt*.97),dx=Math.min(Math.abs(c.hd.x-b.x),Math.abs(nk[0]-b.x)),dz=Math.abs(c.gy-10-b.z);if(dx>FG.R||dz>50)continue;if(dx<bd){bd=dx;best=c}}return best}
+function holdUi(p){atkB.style.setProperty('--p',p);atkB.classList.toggle('hold',p>0)}
+function finDown(){if(FIN.t>=0)return;if(FIN.ok){FIN.on=true;FIN.hold=0;return}b.katk=1;knifeAtk()}
+function finUp(){if(FIN.on&&FIN.t<0){FIN.on=false;const h=FIN.hold;FIN.hold=0;holdUi(0);if(h<FG.HOLD*.98)knifeAtk()}}
+function finUpdate(f){if(FIN.t>=0){if(ME.dead||!FIN.c||FIN.c.fo)finEnd();return}
+ const c=finTarget();FIN.ok=c;if(!!c!==FIN.cls){FIN.cls=!!c;atkB.classList.toggle('fin',!!c);if(c)vib(10)}
+ if(FIN.on){if(!c){FIN.on=false;FIN.hold=0;holdUi(0)}else{FIN.hold+=f/60;holdUi(Math.min(1,FIN.hold/FG.HOLD));if(FIN.hold>=FG.HOLD)finStart(c)}}}
+function finStart(c){FIN.on=false;FIN.hold=0;holdUi(0);FIN.c=c;FIN.t=0;FIN.sn=-1;FIN.pool=0;FIN.pu=0;FIN.gush=0;FIN.ph=0;FIN.nt=FG.C0-.1;FIN.sx=0;FIN.sv=0;FIN.hrt=0;FIN.hj=0;c.slit=1;c.hold=0;c.hAng=c.aH;c.hAv=0;FIN.a0=c.aH;
+ const nk=up(c,0,-BHt*.97),d=c.hd.x>=nk[0]?1:-1;FIN.d=d;FIN.tx=nk[0]-d*FG.OFF;FIN.tz=c.gy-10+5;FIN.h0=[c.hd.x,c.hd.y];FIN.ca0=c.a;FIN.hip=lw(c,0,0);FIN.r0=[c.hd.x-nk[0],c.hd.y-nk[1]];
+ b.fn=1;b.sl=-1;b.kof=null;b.kfl=-1;b.kq=0;b.katk=0;b.ktp=null;ax=ay=0;fireS=false;FIN.cls=false;atkB.classList.remove('fin','dn');vib([20,40,30])}
+function finEnd(){b.fhr=0;if(FIN.c)FIN.c.hold=0;FIN.t=-1;FIN.c=null;b.fn=0;b.fkn=0;b.fnL=0;b.fnh=false}
+const finLife=t=>sg(t,FG.C0-.2,FG.C0+.35)*(1-.55*sg(t,FG.C0+.8,FG.C1))*(1-sg(t,FG.C1,FG.C1+1.2));
+const finEnv=t=>t<FG.A?sg(t,0,FG.A):t<FG.D0?1:1-sg(t,FG.D0,FG.T);
+const d_=v=>v*FIN.d;
+function finPre(f){const c=FIN.c;if(!c||c.fo){finEnd();return}
+ const dt=f/60,g=1-pw(.015,dt);FIN.t+=dt;if(FIN.t>=FG.T){finEnd();return}
+ b.dir=FIN.d;b.x+=(FIN.tx-b.x)*g;b.z+=(FIN.tz-b.z)*g;b.kq=0;b.katk=0;const e=finEnv(FIN.t),tt=FIN.t,sw_=sg(tt,FG.C0,FG.C0+.2)*(1-sg(tt,FG.C1-.1,FG.C1));const stand=1-.8*sg(tt,FG.C1+.05,FG.C1+.6)*(1-sg(tt,FG.H1-.1,FG.H1+.7));
+ if(sw_>0){const spd=FG.F*(1+.35*Math.sin(tt*2.3+1)+.2*Math.sin(tt*5.9))*(.6+.4*Math.abs(Math.sin(tt*1.9+.4)));FIN.ph+=dt*spd*6.2832*Math.min(1,sw_*1.5)}
+ const lf=finLife(tt),hv=e*(1-sg(tt,FG.C1+.2,FG.C1+1));
+ b.fkn=e*stand+hv*(Math.sin(tt*2.6)*.012+sw_*Math.abs(Math.sin(FIN.ph*.5))*.016+Math.sin(tt*9)*.004);b.fnL=e*.3*stand+sw_*Math.sin(FIN.ph-.6)*.03;
+ b.fhr=d_(e*.07+sw_*(Math.sin(FIN.ph)*.022+Math.sin(FIN.ph*2+.8)*.006+Math.sin(tt*13)*.002+Math.sin(tt*8+2)*.002)+FIN.sx*.012*lf*e)}
+function finPost(d,f){const c=FIN.c;if(!c)return;const t=FIN.t,G=FG,e=finEnv(t),hd=c.hd;
+ const dtp=f/60,lf=finLife(t);
+ if(t>=G.C0-.1&&t<G.C1+1.3&&t>=FIN.nt){const a=lf*(.4+rnd()*.6);FIN.sv+=(rnd()<.5?-1:1)*a*2.6;FIN.nt=t+.1+rnd()*.3+(t-G.C0)*.08;
+  for(const p of c.fp){p.vy-=(1+rnd()*2)*a;p.vx+=d*(rnd()-.4)*2*a}for(const p of c.hp){p.vy-=(.8+rnd()*1.4)*a;p.vx+=(rnd()-.5)*2*a}
+  if(c.sev)c.vy-=.35*a;if(a>.6)shk=Math.max(shk,.8)}
+ FIN.sv+=(-FIN.sx*70-FIN.sv*6)*dtp;FIN.sx+=FIN.sv*dtp;FIN.hj=lf*(Math.sin(t*19)*.015+Math.sin(t*2.1+1)*.05)+FIN.sx*.4;
+ if(!c.sev&&t<G.C1+.02){const lt=sg(t,G.L0,G.L1+.5),H=FIN.hip,str=Math.sin(t*23)*.006*lt+Math.sin(t*7.3)*.01*lt+lf*Math.sin(t*17+2)*.005,tg=FIN.ca0-d*.36*lt+str+FIN.sx*.22;c.a=lp(c.a,tg,1-pw(.88,f));const ry=BHt/2;c.cx=H[0]+ry*Math.sin(c.a);c.cy=H[1]-ry*Math.cos(c.a);c.vx=c.vy=c.w=0;c.rest=0}
+ const nk=up(c,0,-BHt*.97),oy=HRY()*.82,ox=d*HRX()*.15,gy0=c.gy;
+ // kepala diangkat tangan kiri (miring ke belakang), lalu sedikit lebih tinggi setelah putus
+ const tilt=sg(t,G.L0,G.L1+.5);c.bdT=-d*.3*tilt*(t<G.C1?1:0);const sawW=sg(t,G.C0,G.C0+.25)*(1-sg(t,G.C1-.12,G.C1)),ph0=FIN.ph,sj=Math.sin(ph0)+.35*Math.sin(ph0*2.7+1.3),dA=c.a-FIN.ca0,cD=Math.cos(dA),sD=Math.sin(dA),r0=FIN.r0,rx=r0[0]*cD-r0[1]*sD,ry2=r0[0]*sD+r0[1]*cD,tr=Math.sin(t*31)*1.1*tilt+Math.sin(t*12.7)*1.6*tilt,hTx=nk[0]+rx*(1+.1*tilt)+sj*1.1*sawW+tr*.4+FIN.sx*6*lf,hTy=nk[1]+ry2*(1+.1*tilt)-5*tilt-Math.abs(sj)*.8*sawW+tr*.5-sg(t,G.C1,G.C1+.5)*20*(1-sg(t,G.H1-.05,G.H1+.55))-8*Math.sin(Math.PI*sg(t,G.L0,G.L0+.4))-Math.abs(FIN.sx)*4*lf;
+ const u2=sg(t,G.C1,G.C1+.6)*(1-sg(t,G.H1-.05,G.H1+.55)),hx2=lp(hTx,b.x+d*192+Math.sin((t-G.C1)*5.5)*10*u2,u2),hy2=lp(hTy,nk[1]-182+Math.sin((t-G.C1)*4.1)*5*u2,u2);hand[0].x=lp(hand[0].x,hx2-ox,e);hand[0].y=lp(hand[0].y,hy2-oy,e);b.fr=lp(b.fr||0,d*(.6+Math.sin(t*4.3)*.04+FIN.sx*.1*lf),e);b.fnh=e>.5;
+ if(t>=G.A&&t<G.H1){const gb=sg(t,G.A,G.A+.25);c.hold=1;hd.x=lp(hd.x,hand[0].x+ox,gb);hd.y=lp(hd.y,hand[0].y+oy,gb);hd.vx=hd.vy=0;c.hAng=FIN.a0v(c,d,tilt,t);c.rest=0}
+ if(t>=G.H1&&c.hold){c.hold=0;hd.px=hd.x;hd.py=hd.y;hd.vx=d*1.6;hd.vy=-2;c.hAv=d*.14;gSnd(false,hd.x);vib(18)}
+ const hb=[hd.x-HRY()*.92*Math.sin(c.hAng),hd.y+HRY()*.92*Math.cos(c.hAng)];
+ // pisau: naik dari bawah leher menyusuri ke dasar kepala sambil menggergaji
+ const p=sg(t,G.C0,G.C1)*.55,Px=lp(nk[0],hb[0],p),Py=lp(nk[1]+8,hb[1],p),sawOn=sg(t,G.C0,G.C0+.12)*(1-sg(t,G.C1-.08,G.C1)),ph=FIN.ph,s=(Math.sin(ph)+.35*Math.sin(ph*2.7+1.3))*sawOn,amp=8+3.5*Math.sin(t*3.1)+2*Math.sin(t*7.7+.5);let cx,cy,ang;
+ if(t<G.C0){const u=sg(t,.15,G.C0);cx=nk[0]-d*16*(1-u);cy=nk[1]+34*(1-u)+8*u;ang=lp(.2,-.16,u)}
+ else if(t<G.C1){cx=Px+d*s*amp+Math.sin(t*13)*.5+Math.sin(t*9+1)*.4+FIN.sx*1.5;cy=Py+Math.sin(ph*.5)*2+2.5*(.5+.5*Math.sin(ph-.5))*sawOn+Math.sin(t*11)*.4;ang=-.16+.12*s+Math.sin(t*7)*.012}
+ else{const u=sg(t,G.C1,G.C1+.35),m=sg(t,G.C1,G.C1+.18);cx=lp(Px,hb[0],m)-d*34*u;cy=lp(Py,hb[1],m)+30*u;ang=lp(-.16,-.42,m)+.95*u;const w=sg(t,G.H1-.25,G.H1+.35);cx=lp(cx,b.x+d*60,w);cy=lp(cy,b.py-BHt*.4,w);ang=lp(ang,.15,w)}
+ const L=(KNF.guard[0]+.5*(KNF.tip[0]-KNF.guard[0])-KNF.g[0])*KNF.W,hx=cx-d*L*Math.cos(ang),hy=cy-L*Math.sin(ang);
+ hand[1].x=lp(hand[1].x,hx,e);hand[1].y=lp(hand[1].y,hy,e);b.kR=lp(b.kR||0,d*ang,e);FIN.nk=nk;FIN.hb=hb;FIN.kx=Px;FIN.ky=Py;FIN.p=p;if(sawOn>.5)shk=Math.max(shk,.3+.2*Math.abs(s));
+ if(t>=G.C0&&t<G.C1){const k=Math.floor(FIN.ph/Math.PI);if(k>FIN.sn){FIN.sn=k;finStroke(k,Px,Py,d,nk,hb)}}else if(t>=G.C1&&FIN.sn<99){FIN.sn=99;finFinal(nk,hb,d)}
+ // darah mengalir: semburan berdenyut dari tunggul leher + tetesan dari dasar kepala + genangan melebar
+ if(t>=G.C0&&t<G.D0+.5){const bl=sg(t,G.C0,G.C0+.4)*(t<G.C1?.6:.8),G1=FIN.gush;
+  if(rnd()<.4*f*bl)emit(nk[0]+(rnd()-.5)*14,nk[1]-4,d*(.1+rnd()*.3),-.8-rnd()*.5,1+G1,6+rnd()*6,gy0,.8,0);
+  if(t>G.C0+.3&&rnd()<.3*f)emit(hd.x+(rnd()-.5)*30,hd.y+HRY()*.55,0,1,1,2,gy0,.4,0);
+  FIN.hrt+=dtp*10.5*(1.1-.5*sg(t,G.C1,G.D0+.6))*(.85+.3*Math.sin(t*1.3));const pl=Math.sin(FIN.hrt),fd=1-.65*sg(t,G.C1+.4,G.D0+.5);if(pl>.93&&FIN.pu<=.93&&fd>.4)stainNear(nk[0],nk[1]-6,300,false,false);if(pl>.93&&FIN.pu<=.93)emit(nk[0],nk[1]-6,d*.3,-1.2,(4+G1*4)*fd,13*(.6+.4*fd),gy0,.6,1);FIN.pu=pl;
+  FIN.pool=Math.min(26,FIN.pool+(.12+G1*.15)*f);if(rnd()<.6*f*bl)stamp(nk[0]+(rnd()-.5)*(30+FIN.pool),gy0+2+rnd()*5,6+rnd()*6+FIN.pool*.25,3+FIN.pool*.07,.2,rnd()<.1)}}
+FIN.a0v=(c,d,tilt,t)=>{const base=FIN.a0+(c.a-FIN.ca0)*.95-d*.22*tilt+(FIN.hj||0)*(t<FG.C1?1:0)+(t>FG.C0&&t<FG.C1?Math.sin(t*14)*.03+Math.sin(t*5.1)*.03:0),u=sg(t,FG.C1,FG.C1+.5),w=t-FG.C1,sw=w>0?Math.sin(w*5.5)*.24*Math.exp(-w*.9)+Math.sin(w*11)*.04*Math.exp(-w*1.6):0;return lp(base,d*.14+sw,u)};
+
+function finStroke(k,Px,Py,d,nk,hb){const c=FIN.c,gy=c.gy;
+ if(k===0){FIN.a0=FIN.a0||0;KNH=1;KDX=d;KDY=-.3;bloodHit(null,c,nk[0],nk[1]-6,d*.3,-.9,false,false,gy);bloodHit(null,c,hb[0],hb[1]-4,-d*.2,.6,true,false,gy);KNH=0;b.kBl=1;WD.push({o:null,c,p:'b',t:5,t0:5,k:0,jf:0,js:0,jd:0,age:0})}
+ stainNear(Px,Py,360,false,false);gunBlood(b,gun,b.dir,Px,Py,420,false,false);khit();emit(Px,Py,d*.4,-1,2+k*.5,9,gy,1,0);fine(Px,Py,d*.3,-1,4+k,gy,9);wet(Px);shk=Math.max(shk,2.2);vib(10);
+ c.hp[0].vy-=1.2;c.hp[1].vy-=1;kick(c,d*(k&1?.12:-.12),-.1)}
+function finFinal(nk,hb,d){const c=FIN.c,gy=c.gy;c.sev=1;FIN.gush=.5;burst(nk[0],nk[1]-6,d*.3,-1,.7,gy);burst(hb[0],hb[1],-d*.3,.5,.35,gy);emit(nk[0],nk[1]-4,d*.4,-1,14,14,gy,1.1);emit(nk[0],nk[1],d*.6,-.6,4,16,gy,.3,1);fine(nk[0],nk[1],d*.4,-.9,30,gy,15);
+ stainNear(nk[0],nk[1]-6,420,false,true);stnAdd(b,'f',2+Math.round(rnd()*2),.8);stnAdd(b,'h',2,.7);stnAdd(b,'b',3+Math.round(rnd()*3),.9);stnAdd(b,'p',2,.7);gunBlood(b,gun,b.dir,nk[0],nk[1],520,false,true);khit();gSnd(true,nk[0]);wet(nk[0]);kick(c,-d*.3,-.4);shk=Math.max(shk,5.5);CK.x+=d*2;vib([25,30,50]);WD.push({o:null,c,p:'b',t:7,t0:7,k:0,jf:0,js:0,jd:0,age:0})}
+// pisau berlumuran darah setelah menggorok (di-cache sekali)
+let KBC=null;function knifeBlood(){if(KBC)return KBC;const im=IM.Knife,W=im.width,H=im.height,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d'),r=sr(4242);g.drawImage(im,0,0);g.globalCompositeOperation='source-atop';
+ g.fillStyle='rgba(112,4,10,.95)';g.beginPath();g.moveTo(W*.5,0);for(let i=1;i<=14;i++)g.lineTo(W*(.5+.05*r()+.025*(i%2)),H*i/14);g.lineTo(W,H);g.lineTo(W,0);g.closePath();g.fill();
+ for(let i=0;i<9;i++){g.fillStyle='rgba('+(170+r()*40|0)+',12,20,.75)';g.beginPath();g.ellipse(W*(.55+r()*.42),H*(.25+r()*.5),W*(.02+r()*.05),H*(.05+r()*.12),0,0,7);g.fill()}
+ g.strokeStyle='rgba(92,3,9,.95)';g.lineCap='round';for(let i=0;i<5;i++){const x=W*(.5+r()*.45),w=2+r()*4;g.lineWidth=w;g.beginPath();g.moveTo(x,H*.45);g.lineTo(x+r()*4-2,H*(.8+r()*.25));g.stroke()}
+ return KBC=c}
+// ================= BOT RAGDOLL (v16): dengan darah =================
+// Bot kena BOT_HITS tembakan -> jatuh (ragdoll). BOT_MAX = jumlah bot hidup maksimum di layar.
+const BOT_HITS=3,BOT_MAX=5;
+const KH=5.5,KN=3.2,KP=.8; // dorongan saat jatuh: kepala / leher / pinggul (makin besar = makin terlempar)
+const ME={dead:false};
+const corpses=[],rounds=[],bots=[];let botSeq=0,camOff=0;
+const HRX=()=>IM.Head5.width*K*.46,HRY=()=>IM.Head5.height*K*.46;
+// ---- geometri tabrakan: segmen peluru vs elips (kepala) / kotak (badan), keduanya boleh berputar
+function segEll(x0,y0,x1,y1,cx,cy,rx,ry,a){const c=Math.cos(-a),s=Math.sin(-a),ax=x0-cx,ay=y0-cy,bx=x1-cx,by=y1-cy;
+ const px=(ax*c-ay*s)/rx,py=(ax*s+ay*c)/ry,qx=(bx*c-by*s)/rx,qy=(bx*s+by*c)/ry,dx=qx-px,dy=qy-py,A=dx*dx+dy*dy,C=px*px+py*py-1;
+ if(C<=0)return 0;if(A<1e-9)return -1;const B=px*dx+py*dy,D=B*B-A*C;if(D<0)return -1;const t=(-B-Math.sqrt(D))/A;return t>=0&&t<=1?t:-1}
+function segRect(x0,y0,x1,y1,ox,oy,a,xa,ya,xb,yb){const c=Math.cos(-a),s=Math.sin(-a),ax=x0-ox,ay=y0-oy,bx=x1-ox,by=y1-oy;
+ const px=ax*c-ay*s,py=ax*s+ay*c,dx=(bx*c-by*s)-px,dy=(bx*s+by*c)-py;let t0=0,t1=1;
+ for(let k=0;k<2;k++){const p=k?py:px,d=k?dy:dx,lo=k?ya:xa,hi=k?yb:xb;
+  if(Math.abs(d)<1e-9){if(p<lo||p>hi)return -1}else{let u=(lo-p)/d,v=(hi-p)/d;if(u>v){const w=u;u=v;v=w}t0=Math.max(t0,u);t1=Math.min(t1,v);if(t0>t1)return -1}}
+ return t0}
+let WBF=null;function wetBuf(){if(WBF||!AC)return WBF||NB;const sr_=AC.sampleRate,n=Math.floor(sr_*.3),buf=AC.createBuffer(1,n,sr_),d=buf.getChannelData(0);let y=0,pk=0;for(let i=0;i<n;i++){y+=(Math.random()*2-1-y)*.07;const t=i/sr_,env=Math.min(1,t/.014)*Math.exp(-t*13);d[i]=y*env;pk=Math.max(pk,Math.abs(d[i]))}for(let i=0;i<n;i++)d[i]/=pk||1;return WBF=buf}
+function gSnd(big,x){if(!AC||AC.state!='running'||!NB||Math.abs(x-camX-VW/2)>VW)return;try{const t0=AC.currentTime,s=AC.createBufferSource();s.buffer=wetBuf();s.playbackRate.value=.5+Math.random()*.3;
+ const lp_=AC.createBiquadFilter();lp_.type='lowpass';lp_.frequency.value=big?420:560;const g=AC.createGain();g.gain.value=big?.5:.3;s.connect(lp_);lp_.connect(g);g.connect(AC.destination);s.start(t0);
+ const o=AC.createOscillator(),og=AC.createGain();o.frequency.setValueAtTime(big?120:160,t0);o.frequency.exponentialRampToValueAtTime(40,t0+.12);og.gain.setValueAtTime(big?.45:.25,t0);og.gain.exponentialRampToValueAtTime(.001,t0+.14);o.connect(og);og.connect(AC.destination);o.start(t0);o.stop(t0+.15)}catch(e){}}
+// ---- efek kena tembak (tanpa darah): kepulan debu + bunyi "duk"
+let KNH=0,KDX=1,KDY=0; // KNH: 0 bukan pisau, 1 sayatan, 2 tusukan | KDX/KDY arah mata pisau
+// 1 = sedang memproses kena pisau (tanpa bunyi dentuman peluru)
+function hitFx(hx,hy,ux,uy,big){
+ for(let i=0;i<(big?6:4);i++)dust.push({x:hx+(Math.random()-.5)*6,y:hy+(Math.random()-.5)*6,vx:ux*(.6+Math.random()*1.6)+(Math.random()-.5)*1.4,vy:uy*.4-.3-Math.random()*1,l:.9});
+ if(!KNH)gSnd(big,hx)}
+// ================= DARAH (v17): cairan + lubang tembak permanen + noda basah yang mengering =================
+// BLK = takaran darah global (1 = asli, makin kecil makin sedikit). Ubah angka ini saja untuk menyetel semua darah (gorok, tembak, tebas).
+const BLK=.28,bq=n=>{n*=BLK;const f=Math.floor(n);return f+(Math.random()<n-f?1:0)};
+let BLD=true;try{BLD=localStorage.getItem('bld')!=='0'}catch(e){}
+const BL=[],WD=[],HL=[];let dry=0;const BK=1.6,BX0=-2600,BY0=-400,BWd=5200,BHh=560,rnd=Math.random;
+// kanvas darah dipecah jadi petak (tile) lebar 1024 + margin; tiap cipratan digambar di petak pemiliknya saja. Dibuat saat dibutuhkan, jadi ringan di HP.
+const TWu=1024,TM=160,BT=[];
+function bcv(x){const n=Math.ceil(BWd/TWu),i=cl(Math.floor((x-BX0)/TWu),0,n-1);let t=BT[i];if(!t){const c=document.createElement('canvas');c.width=Math.round((TWu+2*TM)*BK);c.height=Math.round(BHh*BK);const g=c.getContext('2d');g.scale(BK,BK);g.translate(-(BX0+i*TWu-TM),-BY0);t=BT[i]={c,g,x0:BX0+i*TWu-TM}}return t.g}
+function stamp(x,y,rx,ry,a,lite){rx*=.7;ry*=.7;a*=.8;const g=bcv(x);g.save();g.translate(x,y);g.rotate((rnd()-.5)*.35);a=Math.min(1,a);
+ const dk=rnd()<.45;g.fillStyle=dk?'rgba('+(70+rnd()*22|0)+',3,9,'+a+')':'rgba('+(150+rnd()*40|0)+','+(7+rnd()*8|0)+','+(14+rnd()*8|0)+','+a+')';const n=rx>6?4:2;
+ for(let k=0;k<n;k++){g.beginPath();g.ellipse((rnd()-.5)*rx*.8,(rnd()-.5)*ry*.8,rx*(.5+rnd()*.5),ry*(.5+rnd()*.55),rnd()*3,0,7);g.fill()}
+ if(lite){g.fillStyle='rgba('+(190+rnd()*30|0)+',12,20,'+a*.6+')';g.beginPath();g.ellipse((rnd()-.5)*rx*.4,(rnd()-.5)*ry*.4,rx*.45,ry*.45,rnd()*3,0,7);g.fill()}g.restore()}
+// ---- bentuk tak beraturan (serpihan bergerigi) + palet merah cerah/gelap seperti referensi
+function jag(g,x,y,rx,ry,rot,n,j){g.beginPath();const c=Math.cos(rot),s=Math.sin(rot);
+ for(let i=0;i<n;i++){const an=i/n*6.2832+rnd()*.5,k=1-j+rnd()*j*2,px=Math.cos(an)*rx*k,py=Math.sin(an)*ry*k,X=x+px*c-py*s,Y=y+px*s+py*c;i?g.lineTo(X,Y):g.moveTo(X,Y)}g.closePath()}
+function rcol(dk,a){return rnd()<dk?'rgba('+(66+rnd()*30|0)+',3,9,'+(a||.96)+')':'rgba('+(160+rnd()*45|0)+','+(8+rnd()*12|0)+','+(14+rnd()*10|0)+','+(a||.96)+')'}
+// ledakan percikan permanen (menempel di dinding/udara seperti di video): gumpalan bergerigi + serpihan + garis tipis + kabut titik halus
+function burst(x,y,ux,uy,S,gy){if(!BLD)return;S*=.6;const g=bcv(x),a0=Math.atan2(uy,ux),D=60+S*58;g.save();
+ // kabut titik halus (paling luas)
+ for(let i=0,n=Math.round(40+34*S);i<n;i++){const d=D*(.25+rnd()*1.2),an=a0+(rnd()+rnd()-1)*(.8+d/D*.35),r=.45+rnd()*rnd()*1.7;g.fillStyle=rcol(.18,.9);g.beginPath();g.arc(x+Math.cos(an)*d,y+Math.sin(an)*d,r,0,7);g.fill()}
+ // serpihan / bercak bergerigi: besar dekat titik tembak, mengecil & memanjang ke arah luar
+ for(let i=0,n=Math.round(16+24*S);i<n;i++){const t=rnd(),d=D*Math.pow(t,.85)*1.02,an=a0+(rnd()+rnd()-1)*(.5+t*.35),f=d/D,r=(1.3+rnd()*rnd()*8.5*Math.sqrt(S))*(1-.62*f),el=1+f*2.1;
+  g.fillStyle=rcol(.5*(1-f)+.08);jag(g,x+Math.cos(an)*d,y+Math.sin(an)*d,r*el,r,an,5+(rnd()*4|0),.5);g.fill()}
+ // garis tipis memancar + titik di ujungnya (seperti goresan cipratan)
+ for(let i=0,n=Math.round(9+9*S);i<n;i++){const an=a0+(rnd()-.5)*1.35,L=D*(.4+rnd()*.75),s0=5+rnd()*12,w=1.1+rnd()*1.7,ca=Math.cos(an),sa=Math.sin(an),nx=-sa,ny=ca;
+  g.fillStyle=rcol(.2,.95);g.beginPath();g.moveTo(x+ca*s0+nx*w,y+sa*s0+ny*w);g.lineTo(x+ca*(s0+L),y+sa*(s0+L));g.lineTo(x+ca*s0-nx*w,y+sa*s0-ny*w);g.closePath();g.fill();
+  if(rnd()<.7){g.beginPath();g.arc(x+ca*(s0+L+3+rnd()*7),y+sa*(s0+L+3+rnd()*7),.8+rnd()*1.3,0,7);g.fill()}}
+ // inti basah: gumpalan gelap + tepi merah terang
+ for(let i=0,n=3+Math.round(S*2);i<n;i++){const r=(5+rnd()*7)*Math.sqrt(S+.4),d=rnd()*14,an=a0+(rnd()-.5)*1.4;
+  g.fillStyle=rcol(.75);jag(g,x+Math.cos(an)*d,y+Math.sin(an)*d,r*1.3,r,an,8,.4);g.fill();
+  g.fillStyle='rgba('+(200+rnd()*30|0)+',14,22,.8)';g.beginPath();g.arc(x+Math.cos(an)*(d+r*.5),y+Math.sin(an)*(d+r*.5),r*.28,0,7);g.fill()}
+ g.restore()}
+function wet(x){if(!AC||AC.state!='running'||!NB||Math.abs(x-camX-VW/2)>VW)return;try{const s=AC.createBufferSource();s.buffer=wetBuf();s.playbackRate.value=.8+rnd()*.3;const l=AC.createBiquadFilter();l.type='lowpass';l.frequency.value=520;const g=AC.createGain();g.gain.value=KNH?.14:.55;s.connect(l);l.connect(g);g.connect(AC.destination);s.start()}catch(e){}}
+function emit(x,y,ux,uy,n,sp,gy,sprd,tg){if(!BLD)return;n=bq(n);const a0=Math.atan2(uy,ux);
+ for(let i=0;i<n;i++){if(BL.length>600)BL.shift();const a=a0+(rnd()-.5)*(sprd||1),v=tg?sp*(.92+rnd()*.16):sp*(.15+rnd()*.95),big=rnd()<(tg?.4:.2);
+  BL.push({x:x+(rnd()-.5)*4,y:y+(rnd()-.5)*4,vx:Math.cos(a)*v,vy:Math.sin(a)*v-(tg?0:.6+rnd()*1.2),r:big?2.4+rnd()*2.2:.9+rnd()*1.2,gy:gy+(rnd()-.5)*18,s:0})}}
+function fine(x,y,ux,uy,n,gy,sp){if(!BLD)return;n=bq(n);const a0=Math.atan2(uy,ux);for(let i=0;i<n;i++){if(BL.length>600)BL.shift();const a=a0+(rnd()+rnd()-1)*.9,v=sp*(.25+rnd()*.85);BL.push({x:x+(rnd()-.5)*6,y:y+(rnd()-.5)*6,vx:Math.cos(a)*v,vy:Math.sin(a)*v-rnd()*2.2,r:.45+rnd()*rnd()*1.3,gy:gy+(rnd()-.5)*26,s:rnd()<.35?1:0})}}
+function chunks(x,y,ux,uy,n,gy){if(!BLD)return;for(let i=0;i<n;i++)BL.push({x,y,vx:ux*(3+rnd()*7)+(rnd()-.5)*5,vy:uy*3-2-rnd()*6,r:3+rnd()*3.5,gy:gy+(rnd()-.5)*14,s:0,ch:1})}
+function wpos(w){if(w.c){const c=w.c;return w.p==='h'?[c.hd.x,c.hd.y]:lw(c,0,-BHt*.5)}const r=w.o.rig;return w.p==='h'?[r.head.x,r.head.y]:[r.b.px,r.b.py-BHt*.5]}
+function wgy(w){return w.c?w.c.gy:w.o.rig.b.z+10}
+// lubang tembak menempel di badan/kepala (koordinat lokal) -> ikut bergerak, miring, jatuh bersama karakter
+function hfr(h){if(h.c){const c=h.c;return h.p==='h'?[c.hd.x,c.hd.y,c.aH]:[c.Ox,c.Oy,c.a]}const r=h.o.rig,q=r.b;return h.p==='h'?[r.head.x,r.head.y,q.rot+(q.sb||0)*.7+q.dir*(q.fk||0)*.13+q.hx*.012+Math.sin(q.ph)*.01]:[q.px,q.py,q.rot||0]}
+function wim(h){if(h.c)return h.p==='h'?h.c.hi:h.c.bi;const q=h.o.rig.b;if(h.p!=='h')return q.t<-.35?IM.Body1:q.t>.35?IM.Body3:IM.Body2;return IM['Head'+(q.hp>0?'D':'')+cl(5+Math.round(q.t*2),3,7)]}
+const AM=new Map();function alp(im){let m=AM.get(im);if(m===undefined){m=null;try{const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const g=c.getContext('2d');g.drawImage(im,0,0);m=g.getImageData(0,0,c.width,c.height)}catch(e){}AM.set(im,m)}return m}
+// geser titik tembak ke piksel badan yang benar-benar terisi (kotak tabrakan lebih besar dari siluet sprite)
+function snap(h){const I=wim(h),hd=h.p==='h',w=hd?I.width*K:Bw,ht=hd?I.height*K:BHt,ox=hd?w/2:Bw/2,oy=hd?ht/2:BHt,m=alp(I);if(!m)return;let x=h.lx,y=h.ly;const cx=w/2-ox,cy=ht/2-oy;
+ const A=(x,y)=>{const u=Math.floor((x+ox)/w*m.width),v=Math.floor((y+oy)/ht*m.height);return u<0||v<0||u>=m.width||v>=m.height?0:m.data[(v*m.width+u)*4+3]};
+ for(let i=0;i<20;i++){const e=3*m.width/w;if(A(x,y)>200&&A(x+3,y)>200&&A(x-3,y)>200&&A(x,y+3)>200&&A(x,y-3)>200)break;x+=(cx-x)*.18;y+=(cy-y)*.18}h.lx=x;h.ly=y}
+const WS=document.createElement('canvas');WS.width=320;WS.height=560;const WG=WS.getContext('2d');
+function wlist(c,p){const L=[];for(const h of HL)if(h.p===p&&(c?h.c===c:h.o&&h.o.id===RIGID))L.push(h);return L}
+function sr(sd){let t=sd%2147483647||7;return()=>{t=t*16807%2147483647;return t/2147483647}}
+// luka digambar DI DALAM sprite (dipotong siluet badan) -> menyatu dengan tubuh: noda meresap + aliran + lubang bergerigi
+// sayatan pisau: celah meruncing bergerigi mulai dari titik masuk bilah dan memanjang searah ayunan (makin lama makin terbuka), bibir luka merah, inti gelap, darah merembes & menetes
+function paintCut(g,h,X,Y,Z,gvx,gvy){const f=sr(h.sd),a=h.age,hd=h.p==='h',L=(hd?40:78)*Math.min(1,.25+a*5)*Z,dx=h.gx||1,dy=h.gy||0,nx=-dy,ny=dx,hw=(hd?2:2.8)*Z,
+ sx=X-dx*L*.12,sy=Y-dy*L*.12,ex=X+dx*L*.88,ey=Y+dy*L*.88,bd=(f()-.5)*L*.16,cx=(sx+ex)/2+nx*bd,cy=(sy+ey)/2+ny*bd,N=16,jt=[],jb=[];
+ for(let i=0;i<=N;i++){jt.push(1+(f()-.5)*.7);jb.push(1+(f()-.5)*.7)}
+ const P=t=>[(1-t)*(1-t)*sx+2*t*(1-t)*cx+t*t*ex,(1-t)*(1-t)*sy+2*t*(1-t)*cy+t*t*ey];
+ const lens=(k,col,off)=>{g.beginPath();const o=off||0,T=[],B=[];
+  for(let i=0;i<=N;i++){const t=i/N,p=P(t),w=hw*k*Math.pow(Math.sin(Math.PI*t),.7);T.push([p[0]+nx*(w*jt[i]+o),p[1]+ny*(w*jt[i]+o)]);B.push([p[0]-nx*(w*jb[i]-o),p[1]-ny*(w*jb[i]-o)])}
+  g.moveTo(T[0][0],T[0][1]);for(let i=1;i<=N;i++)g.lineTo(T[i][0],T[i][1]);for(let i=N;i>=0;i--)g.lineTo(B[i][0],B[i][1]);g.closePath();g.fillStyle=col;g.fill()};
+ lens(3.4,'rgba(80,3,9,.36)');lens(1.9,'rgba(122,6,14,.96)');lens(1,'#0b0102');
+ const sg=(nx*gvx+ny*gvy)>=0?1:-1;lens(.4,'rgba(200,16,24,.8)',sg*hw*.18);
+ const M=hd?3:6;
+ for(let j=0;j<M;j++){const t=.12+.76*((j+f()*.8)/M),p=P(t),w=hw*1.5*Math.pow(Math.sin(Math.PI*t),.7),qx=p[0]+nx*sg*w,qy=p[1]+ny*sg*w,
+  dw=(1+f()*1.6)*Z,Lm=Math.min((hd?20:62)*Z*(.3+f()*.9),a*(9+f()*12)*Z),ex2=qx+gvx*Lm,ey2=qy+gvy*Lm;
+  g.lineCap='round';g.strokeStyle='rgba(88,3,10,.95)';g.lineWidth=dw;g.beginPath();g.moveTo(qx,qy);g.lineTo(ex2,ey2);g.stroke();
+  g.strokeStyle='rgba(190,14,22,.5)';g.lineWidth=dw*.36;g.beginPath();g.moveTo(qx-dw*.2,qy);g.lineTo(ex2-dw*.12,ey2);g.stroke();
+  g.fillStyle='rgba(98,4,11,.97)';g.beginPath();g.arc(ex2,ey2,dw*.8,0,6.283);g.fill()}}
+function paintWound(g,h,X,Y,Z,gx,gy){if(h.k===1)return paintCut(g,h,X,Y,Z,gx,gy);const f=sr(h.sd),a=h.age,hd=h.p==='h',R=(hd?11:16)*(h.k===2?.85:1)*Math.min(1,.35+a*.5)*Z;
+ const jg=(x,y,rx,ry,n,j,col)=>{g.beginPath();const rot=f()*6.28;for(let i=0;i<n;i++){const an=i/n*6.283,k=1-j+f()*j*2,px=Math.cos(an)*rx*k,py=Math.sin(an)*ry*k,cs=Math.cos(rot),sn=Math.sin(rot),qx=x+px*cs-py*sn,qy=y+px*sn+py*cs;i?g.lineTo(qx,qy):g.moveTo(qx,qy)}g.closePath();g.fillStyle=col;g.fill()};
+ // noda meresap
+ for(let i=0;i<5;i++)jg(X+(f()-.5)*R*.9+gx*R*.25,Y+(f()-.5)*R*.9+gy*R*.3,R*(.5+f()*.5),R*(.45+f()*.5),9,.45,'rgba(70,3,9,.5)');
+ // daging robek: tepi merah gelap bergerigi + bercak merah terang
+ jg(X,Y,R*1.05,R*.95,12,.42,'rgba(118,5,13,.93)');
+ for(let i=0;i<5;i++){const an=f()*6.283,d=R*(.35+f()*.6);jg(X+Math.cos(an)*d,Y+Math.sin(an)*d,R*(.16+f()*.22),R*(.14+f()*.2),6,.5,'rgba('+(175+f()*40|0)+',12,20,.9)')}
+ // serat radial halus (rambut/robekan) seperti di referensi
+ g.lineCap='round';for(let i=0;i<16;i++){const an=f()*6.283,r1=R*(.7+f()*.3),r2=R*(1.15+f()*.9);g.strokeStyle='rgba(95,4,11,'+(.5+f()*.4)+')';g.lineWidth=(.5+f()*.7)*Z;g.beginPath();g.moveTo(X+Math.cos(an)*r1,Y+Math.sin(an)*r1);g.lineTo(X+Math.cos(an)*r2,Y+Math.sin(an)*r2);g.stroke()}
+ // lubang inti hitam bergerigi
+ jg(X,Y,R*.5,R*.44,9,.5,'#0a0102');g.strokeStyle='rgba(165,10,20,.9)';g.lineWidth=.9*Z;g.stroke();
+ // Aliran darah halus dengan geometri lebih murah; kualitas kanvas/aset HD tidak diturunkan.
+ const nF=hd?2:3;
+ for(let j=0;j<nF;j++){
+  const o=(f()-.5)*R*1.5,w=(1.5+f()*1.9)*Z,Lm=(hd?34:80)*Z*(.5+f()),L=Math.min(Lm,a*(11+f()*11)*Z),ph=f()*6.283,px=-gy*o+X,py=gx*o+Y;
+  const ex=px+gx*L-gy*Math.sin(ph)*1.1*Z,ey=py+gy*L+gx*Math.sin(ph)*1.1*Z;
+  g.lineCap='round';g.strokeStyle='rgba(88,3,10,.95)';g.lineWidth=w;g.beginPath();g.moveTo(px,py);g.quadraticCurveTo((px+ex)*.5-gy*Z,(py+ey)*.5+gx*Z,ex,ey);g.stroke();
+  g.strokeStyle='rgba(190,14,22,.55)';g.lineWidth=w*.38;g.beginPath();g.moveTo(px-w*.2,py);g.quadraticCurveTo((px+ex)*.5-gy*Z,(py+ey)*.5+gx*Z,ex-w*.12,ey);g.stroke();
+  g.fillStyle='rgba(98,4,11,.97)';g.beginPath();g.arc(ex,ey,w*.8,0,6.283);g.fill();g.fillStyle='rgba(205,18,26,.6)';g.beginPath();g.arc(ex-w*.2,ey-w*.2,w*.25,0,6.283);g.fill();
+ }}
+// luka di-cache per bagian tubuh: digambar ulang hanya saat perlu (luka baru / aliran masih tumbuh / badan berputar cukup jauh), bukan tiap frame
+function wOv(im,w,h,ox,oy,L,x,y,rot,sy,sb){if(!L.length)return;
+ const own=L[0].c||L[0].o,pp=L[0].p,C=own.__wc||(own.__wc={}),Z=Math.min(2,WS.width/w,WS.height/h),W=Math.ceil(w*Z),H=Math.ceil(h*Z);
+ let mx=0;for(const q of L)if(q.age>mx)mx=q.age;const ab=Math.min(48,Math.floor(mx*4)); // aliran berhenti tumbuh setelah ~12 dtk -> tidak digambar ulang lagi (sebelumnya digambar ulang 60x/detik)
+ let E=C[pp];
+ if(!E||E.im!==im||E.n!==L.length||E.ab!==ab||Math.abs(E.rot-rot)>.12){
+  if(!E){E=C[pp]={cv:document.createElement('canvas')}}
+  E.cv.width=W;E.cv.height=H;const g=E.cv.getContext('2d');g.drawImage(im,0,0,W,H);g.globalCompositeOperation='source-atop';
+  const gx=Math.sin(rot),gy=Math.cos(rot);for(const q of L)paintWound(g,q,(q.lx+ox)*Z,(q.ly+oy)*Z,Z,gx,gy);
+  E.im=im;E.n=L.length;E.ab=ab;E.rot=rot;E.W=W;E.H=H}
+ ctx.save();ctx.translate(x,y);ctx.rotate(rot);if(sy)ctx.scale(1,sy);
+ if(!sb||Math.abs(sb)<.004)ctx.drawImage(E.cv,0,0,E.W,E.H,-ox,-oy,w,h);
+ else{const wy=-BHt*.45;ctx.save();ctx.beginPath();ctx.rect(-Bw,wy-5,Bw*2,-wy+20);ctx.clip();ctx.drawImage(E.cv,0,0,E.W,E.H,-ox,-oy,w,h);ctx.restore();
+  ctx.translate(0,wy);ctx.rotate(sb);ctx.translate(0,-wy);ctx.beginPath();ctx.rect(-Bw,-BHt-20,Bw*2,BHt*.55+20+6);ctx.clip();ctx.drawImage(E.cv,0,0,E.W,E.H,-ox,-oy,w,h)}
+ ctx.restore()}
+function hpos(h){const f=hfr(h),cs=Math.cos(f[2]),sn=Math.sin(f[2]);return[f[0]+h.lx*cs-h.ly*sn,f[1]+h.lx*sn+h.ly*cs]}
+// ---- bercak darah di senjata: disimpan per pemilik (B.gst) dalam koordinat lokal senjata, digambar DI DALAM siluet senjata, di-cache (tidak digambar ulang tiap frame)
+function gunBlood(B,G,...a){const w0=WI;useW(B.gw|0);try{gunBlood0(B,G,...a)}finally{useW(w0)}}
+function gunBlood0(B,G,dir,hx,hy,R,hs,kill){if(!BLD||!GW||!G)return;
+ const dx=hx-G.x,dy=hy-G.y,D=Math.hypot(dx,dy),P=Math.max(0,1-D/R)*(hs?1.25:1)*(kill?1.3:1);if(P<.06)return;
+ const S=B.gst||(B.gst={l:[],cv:null,dirty:false}),c=Math.cos(G.r),sn=Math.sin(G.r),lx=(dx*c+dy*sn)*(dir||1),u0=cl(lx/GW+.5,.12,.9),n=1+Math.round(rnd()*P*5+P*2.5);
+ for(let i=0;i<n;i++)S.l.push({u:cl(u0+(rnd()-.5)*(.16+.5*(1-Math.min(1,P))),.04,.97),v:.22+rnd()*.56,r:(1+rnd()*rnd()*4.5)*(.6+Math.min(1,P)*.8),sd:1+Math.floor(rnd()*2e9)});
+ while(S.l.length>70)S.l.shift();S.dirty=true}
+function gunImg(S){if(!S||!S.l.length||!BLD)return GIM;
+ if(S.dirty||!S.cv||S.wi!==WI){S.wi=WI;const k=2,Wc=Math.round(GW*k),Hc=Math.round(GH*k);if(!S.cv)S.cv=document.createElement('canvas');S.cv.width=Wc;S.cv.height=Hc;const g=S.cv.getContext('2d');g.drawImage(GIM,0,0,Wc,Hc);g.globalCompositeOperation='source-atop';g.lineCap='round';
+  for(const q of S.l){const f=sr(q.sd),X=q.u*Wc,Y=q.v*Hc,r=q.r*k,dk=f()<.5;
+   // gumpalan basah bergerigi + kilap merah terang
+   g.beginPath();const rot=f()*6.28,cs=Math.cos(rot),sn=Math.sin(rot),N=9;for(let i=0;i<N;i++){const an=i/N*6.283,kk=.6+f()*.8,px=Math.cos(an)*r*(1+f()*.5)*kk,py=Math.sin(an)*r*(.8+f()*.5)*kk,qx=X+px*cs-py*sn,qy=Y+px*sn+py*cs;i?g.lineTo(qx,qy):g.moveTo(qx,qy)}g.closePath();
+   g.fillStyle=dk?'rgba(92,4,10,.93)':'rgba(160,10,18,.93)';g.fill();g.fillStyle='rgba(215,32,38,.5)';g.beginPath();g.ellipse(X-r*.25,Y-r*.25,r*.32,r*.24,0,0,7);g.fill();
+   if(q.r>2.2){const L=r*(2+f()*4),w=Math.max(1,r*.34);g.strokeStyle='rgba(96,4,10,.92)';g.lineWidth=w;g.beginPath();g.moveTo(X,Y);g.lineTo(X+(f()-.5)*r*.4,Y+L);g.stroke();g.fillStyle='rgba(110,5,12,.95)';g.beginPath();g.arc(X,Y+L,w*.75,0,7);g.fill()}
+   if(q.r>1.5)for(let i=0;i<3;i++){const an=f()*6.283,d=r*(1.6+f()*1.8);g.fillStyle='rgba(150,8,16,.9)';g.beginPath();g.arc(X+Math.cos(an)*d,Y+Math.sin(an)*d,.7+f()*r*.22,0,7);g.fill()}}
+  S.dirty=false}
+ return S.cv}
+
+// ================= NODA DARAH (v37) =================
+// Cipratan menempel di muka, tangan, pisau, badan (senjata api lewat gunBlood). Disimpan per karakter di B.stn[kunci], digambar ulang hanya saat berubah.
+const STS={f:1,h:.55,k:.5,b:1.1,p:.7};
+function stnAdd(B,key,n,P){if(!BLD)return;const S=(B.stn||(B.stn={}))[key]||(B.stn[key]={l:[],v:0,m:new Map()});
+ for(let i=0;i<n;i++){let u=.1+rnd()*.8,v=.12+rnd()*.76;if(key==='k')u=.3+rnd()*.65;if(key==='f'){u=.18+rnd()*.64;v=.2+rnd()*.65}
+  S.l.push({u,v,r:(1+rnd()*rnd()*4.2)*(.6+Math.min(1,P)*.8),sd:1+Math.floor(rnd()*2e9)})}
+ while(S.l.length>(key==='b'?45:key==='p'?30:60))S.l.shift();S.v++}
+function stnImg(B,key,im){const S=B&&B.stn&&B.stn[key];if(!S||!S.l.length||!BLD||!im)return im;
+ let e=S.m.get(im);if(e&&e.v===S.v)return e.cv;
+ const W=im.width,H=im.height;if(!e){e={cv:document.createElement('canvas'),v:-1};S.m.set(im,e)}
+ const cv=e.cv;cv.width=W;cv.height=H;const g=cv.getContext('2d');g.drawImage(im,0,0);g.globalCompositeOperation='source-atop';g.lineCap='round';
+ const sc=(STS[key]||1)/K;
+ for(const q of S.l){const f=sr(q.sd),X=q.u*W,Y=q.v*H,r=q.r*sc,dk=f()<.5;
+  g.beginPath();const rot=f()*6.28,cs=Math.cos(rot),sn=Math.sin(rot),N=9;for(let i=0;i<N;i++){const an=i/N*6.283,kk=.6+f()*.8,px=Math.cos(an)*r*(1+f()*.5)*kk,py=Math.sin(an)*r*(.8+f()*.5)*kk,qx=X+px*cs-py*sn,qy=Y+px*sn+py*cs;i?g.lineTo(qx,qy):g.moveTo(qx,qy)}g.closePath();
+  g.fillStyle=dk?'rgba(92,4,10,.9)':'rgba(160,10,18,.9)';g.fill();g.fillStyle='rgba(215,32,38,.45)';g.beginPath();g.ellipse(X-r*.25,Y-r*.25,r*.32,r*.24,0,0,7);g.fill();
+  if(q.r>2){const L=r*(1.6+f()*3.2),w=Math.max(1,r*.3);g.strokeStyle='rgba(96,4,10,.88)';g.lineWidth=w;g.beginPath();g.moveTo(X,Y);g.lineTo(X+(f()-.5)*r*.3,Y+L);g.stroke();g.fillStyle='rgba(110,5,12,.92)';g.beginPath();g.arc(X,Y+L,w*.75,0,7);g.fill()}
+  if(q.r>1.4)for(let i=0;i<3;i++){const an=f()*6.283,d=r*(1.5+f()*1.6);g.fillStyle='rgba(150,8,16,.85)';g.beginPath();g.arc(X+Math.cos(an)*d,Y+Math.sin(an)*d,.6+f()*r*.2,0,7);g.fill()}}
+ e.v=S.v;return cv}
+
+// noda badan & kaki digambar langsung (tanpa kanvas tambahan -> tidak menambah tekstur): dipotong ke bentuk badan/kaki lalu splat dilukis di koordinat sprite
+function stnPaint(g,S,W,H,sc){g.lineCap='round';
+ for(const q of S.l){const f=sr(q.sd),X=q.u*W,Y=q.v*H,r=q.r*sc,dk=f()<.5;
+  g.beginPath();const rot=f()*6.28,cs=Math.cos(rot),sn=Math.sin(rot),N=9;for(let i=0;i<N;i++){const an=i/N*6.283,kk=.6+f()*.8,px=Math.cos(an)*r*(1+f()*.5)*kk,py=Math.sin(an)*r*(.8+f()*.5)*kk,qx=X+px*cs-py*sn,qy=Y+px*sn+py*cs;i?g.lineTo(qx,qy):g.moveTo(qx,qy)}g.closePath();
+  g.fillStyle=dk?'rgba(92,4,10,.9)':'rgba(160,10,18,.9)';g.fill();g.fillStyle='rgba(215,32,38,.45)';g.beginPath();g.ellipse(X-r*.25,Y-r*.25,r*.32,r*.24,0,0,7);g.fill();
+  if(q.r>2){const L=r*(1.6+f()*3.2),w=Math.max(1,r*.3);g.strokeStyle='rgba(96,4,10,.88)';g.lineWidth=w;g.beginPath();g.moveTo(X,Y);g.lineTo(X+(f()-.5)*r*.3,Y+L);g.stroke();g.fillStyle='rgba(110,5,12,.92)';g.beginPath();g.arc(X,Y+L,w*.75,0,7);g.fill()}}}
+function stnBody(){const S=b.stn&&b.stn.b;if(!S||!S.l.length||!BLD||RIGID)return;const W=Bw/K,H=BHt/K;
+ ctx.save();ctx.translate(b.px,b.py);ctx.rotate(b.rot);ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-Bw*.4,-BHt*.97,Bw*.8,BHt*.93,Bw*.2);else ctx.rect(-Bw*.4,-BHt*.97,Bw*.8,BHt*.93);ctx.clip();ctx.translate(-Bw/2,-BHt);ctx.scale(K,K);stnPaint(ctx,S,W,H,STS.b/K);ctx.restore()}
+function stnFoot(im,x,y,rot){const S=b.stn&&b.stn.p;if(!S||!S.l.length||!BLD||RIGID)return;const w=im.width*K,h=im.height*K;
+ ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.beginPath();ctx.ellipse(0,0,w*.42,h*.4,0,0,7);ctx.clip();ctx.translate(-w/2,-h/2);ctx.scale(K,K);stnPaint(ctx,S,im.width,im.height,STS.p/K);ctx.restore()}
+// cipratan dari titik (hx,hy) mengenai bagian tubuh pembunuh sesuai jarak (R = jangkauan)
+function stainNear(hx,hy,R,hs,kill){if(!BLD||ME.dead||RIGID)return;const P0=(hs?1.25:1)*(kill?1.3:1),d=b.dir||1,kr=b.kR||0,kx=hand[1].x+d*Math.cos(kr)*46,ky=hand[1].y+Math.sin(kr)*46;
+ for(const T of [['f',head.x,head.y,1,4],['h',hand[0].x,hand[0].y,.9,3],['h',hand[1].x,hand[1].y,.9,3],['k',kx,ky,1.15,5],['b',b.px,b.py-BHt*.5,1.05,4],['p',foot[0].x,foot[0].y,1.1,3],['p',foot[1].x,foot[1].y,1.1,3]]){
+  const P=Math.max(0,1-Math.hypot(hx-T[1],hy-T[2])/(R*T[3]))*P0;if(P<.08)continue;stnAdd(b,T[0],1+Math.round(rnd()*P*T[4]*.35+P*.7),P)}}
+function bloodHit(o,c,hx,hy,ux,uy,hs,kill,gy){if(!BLD)return;
+ const h={o,c,p:hs?'h':'b',lx:0,ly:0,age:0,ph:rnd()*6,k:KNH|0},f=hfr(h),dx=hx-f[0],dy=hy-f[1],cs=Math.cos(f[2]),sn=Math.sin(f[2]);h.lx=dx*cs+dy*sn;h.ly=-dx*sn+dy*cs;if(h.k===1){h.gx=KDX*cs+KDY*sn;h.gy=-KDX*sn+KDY*cs}h.sd=1+Math.floor(rnd()*2e9);snap(h);HL.push(h);if(HL.length>80)HL.shift();
+ const SZ=kill?(hs?1.9:1.25):(hs?.85:.55);burst(hx,hy,ux,uy,SZ,gy);burst(hx,hy,-ux*.6,uy*.5-.3,SZ*.28,gy);
+ if(o){const r=o.rig;gunBlood(r.b,r.gun,r.b.dir,hx,hy,230,hs,kill)}else if(c&&c.g)gunBlood(c,c.g,c.d,hx,hy,230,hs,kill);
+ if(!ME.dead){gunBlood(b,gun,b.dir,hx,hy,760,hs,kill);stainNear(hx,hy,330,hs,kill)} // cipratan balik ke senjata penembak: makin dekat makin banyak
+ emit(hx,hy,ux,uy,hs?18:12,13,gy,.9);emit(hx,hy,-ux,uy*.5,5,6,gy,1.6);emit(hx,hy,ux,uy,6,18,gy,.22,1);fine(hx,hy,ux,uy,Math.round(30*SZ+12),gy,16);wet(hx);
+ if(kill){emit(hx,hy,ux,uy-.4,hs?16:10,15,gy,2);fine(hx,hy,ux,uy-.3,hs?50:28,gy,18);chunks(hx,hy,ux,uy,hs?7:3,gy);if(hs)CK.x+=ux*5;vib(hs?[30,30,60]:28)}
+ if(c||kill){WD.push({o,c,p:hs?'h':'b',t:kill?7:4,t0:kill?7:4,k:0,jf:0,js:0,jd:0,age:0});if(WD.length>10)WD.shift()}}
+function stepBlood(f){
+ for(let i=HL.length-1;i>=0;i--){const h=HL[i];if(h.o&&!bots.includes(h.o)&&!h.c||h.c&&h.c.fa<=0){HL.splice(i,1);continue}h.age+=f/60}
+ for(let i=WD.length-1;i>=0;i--){const w=WD[i];if(w.o&&!bots.includes(w.o)&&!w.c||w.c&&w.c.fa<=0){WD.splice(i,1);continue}
+  w.t-=f/60;w.age+=f/60;w.k-=f;if(w.t<=0){WD.splice(i,1);continue}
+  const q=wpos(w),live=!w.c,fr=w.t/w.t0,gy=wgy(w);
+  if(w.c&&w.age<12){const c=w.c;c.pool=Math.min(34,(c.pool||0)+.05*f);if(rnd()<.5*f)stamp(c.cx+(rnd()-.5)*c.pool*.5,c.gy+3+rnd()*4,c.pool*(.6+rnd()*.4),c.pool*.3,.1,rnd()<.08)}}
+  for(let i=BL.length-1;i>=0;i--){const q=BL[i];q.vy+=.5*f;q.vx*=1-.008*f;q.vy*=1-.004*f;q.x+=q.vx*f;q.y+=q.vy*f;
+  if(q.ch&&rnd()<.35*f&&BL.length<600)BL.push({x:q.x,y:q.y,vx:q.vx*.3,vy:0,r:1.2,gy:q.gy,s:1});
+  if(q.y>=q.gy){const sp=Math.hypot(q.vx,q.vy);
+   if(q.ch){stamp(q.x,q.gy,q.r*2.4+sp*.5,q.r*.9,.7,1);q.y=q.gy;q.vy=-Math.abs(q.vy)*.35;q.vx*=.55;q.r*=.8;if(q.r<1.6||sp<1.5){stamp(q.x,q.gy,q.r*2.2,q.r*.8,.9,1);BL.splice(i,1)}continue}
+   {const sq=Math.min(sp,10);stamp(q.x,q.gy,q.r*(1+sq*(q.r>1.8?.14:.22)),q.r*(.5+sq*.015),.92,q.r>1.8)}
+   const ns=q.r>1.8?3:(rnd()<.18?1:0),dr=q.vx>=0?1:-1;for(let k=0;k<ns;k++)stamp(q.x+dr*(2+rnd()*q.r*5+sp*rnd()),q.gy+(rnd()-.5)*4,.5+rnd()*.9,.35+rnd()*.3,.85,0);
+   if(!q.s&&sp>7&&rnd()<.5)for(let k=0;k<2;k++)BL.push({x:q.x,y:q.gy-1,vx:q.vx*.4*(rnd()+.2),vy:-sp*.3*rnd(),r:q.r*.45,gy:q.gy,s:1});
+   BL.splice(i,1)}}}
+function drawBlood(){if(!BT.length||!BLD)return;for(const t of BT){if(!t)continue;const x0=Math.max(t.x0,camX-40),x1=Math.min(t.x0+TWu+2*TM,camX+VW+40);if(x1<=x0)continue;
+ ctx.drawImage(t.c,(x0-t.x0)*BK,0,(x1-x0)*BK,BHh*BK,x0,BY0,x1-x0,BHh)}}
+function drawBloodFly(){if(!BLD)return;ctx.save();ctx.lineCap='round';
+ for(const q of BL){if(q.x<camX-40||q.x>camX+VW+40)continue;
+  if(q.ch){ctx.fillStyle='#8a0b14';ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,7);ctx.fill();continue}
+  const tx=q.x-q.vx*.85,ty=q.y-q.vy*.85;ctx.strokeStyle=q.s?'#7a0710':'#c0121b';ctx.lineWidth=q.r*1.7;ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(q.x,q.y);ctx.stroke();}
+ ctx.restore()}
+// ---- ragdoll jatuh (v13): badan = benda tegar (posisi, sudut, putaran) yang menumbuk lantai lewat 6 titik (impuls + gesekan + pantul);
+//      kepala / tangan / kaki = titik fisika yang menggantung di badan (tali + batas tekuk leher) jadi ikut terayun, terseret, tersentak.
+//      Tanpa darah, tanpa peluru/selongsong berserakan.
+let CPT=null;
+const cpts=()=>CPT||(CPT=[[-Bw*.12,-6],[Bw*.12,-6],[-Bw*.36,-BHt*.25],[Bw*.36,-BHt*.25],[-Bw*.36,-BHt*.5],[Bw*.36,-BHt*.5],[-Bw*.36,-BHt*.75],[Bw*.36,-BHt*.75],[0,-BHt+12],[-Bw*.3,-BHt+34],[Bw*.3,-BHt+34]]); // alas sempit di kaki -> tidak bisa berdiri tegak seperti patung
+const up=(c,lx,ly)=>{const py=-BHt*.45,dy=ly-py,cs=Math.cos(c.bd||0),sn=Math.sin(c.bd||0);return lw(c,lx*cs-dy*sn,py+lx*sn+dy*cs)}; // titik badan atas (ikut tekuk pinggang)
+const lw=(c,lx,ly)=>{const ry=ly+BHt/2,cs=Math.cos(c.a),sn=Math.sin(c.a);return[c.cx+lx*cs-ry*sn,c.cy+lx*sn+ry*cs]}; // titik lokal badan (asal = tengah bawah) -> dunia
+const mkPt=(x,y,vx,vy,r)=>({x,y,vx:vx||0,vy:vy||0,r,px:x,py:y,hit:0});
+function kick(c,jx,jy,x,y){c.vx+=jx;c.vy+=jy;if(x!==undefined)c.w+=((x-c.cx)*jy-(y-c.cy)*jx)/c.I;c.rest=0}
+let KPW=1; // pengali dorongan mayat (peluru Benelli); diisi botDie
+function makeCorpse(ux,uy,part,hx,hy,soft){
+ const d=b.dir,gy=b.z+10,hs=part==='h',cs=Math.cos(b.rot),sn=Math.sin(b.rot),H=Math.hypot,SF=soft?.4:1;
+ const c={cx:b.px+(BHt/2)*sn,cy:b.py-(BHt/2)*cs,a:b.rot,vx:soft?cl(b.vx*.5+(b.hxv||0),-1.6,1.6):b.vx*.8,vy:soft?cl((b.hdv||0)*.5,-1,1.5):0,w:soft?cl(b.hrv||0,-.03,.03):0,bd:b.sb||0,bv:soft?(b.sbv||0):0,I:(Bw*Bw+BHt*BHt)/12*1.15,gy,d,rest:0,age:0,fa:1,fo:false,hard:0,sa:-99,touch:0,
+  bi:b.t<-.35?IM.Body1:b.t>.35?IM.Body3:IM.Body2,hi:IM['Head'+cl(5+Math.round(b.t*2),3,7)],R:d>0?'R':'L'};
+ const nk=up(c,0,-BHt*.97),sh=up(c,0,-BHt*.72),hp=lw(c,0,-4);
+ c.L={h:H(head.x-nk[0],head.y-nk[1])||26,a:[Math.max(50,H(hand[0].x-sh[0],hand[0].y-sh[1])),Math.max(50,H(hand[1].x-sh[0],hand[1].y-sh[1]))],l:[Math.max(34,H(foot[0].x-hp[0],foot[0].y-hp[1])),Math.max(34,H(foot[1].x-hp[0],foot[1].y-hp[1]))]};
+ c.hd=mkPt(head.x,head.y,head.vx,head.vy,58);
+ c.hp=[mkPt(hand[0].x,hand[0].y,0,0,9),mkPt(hand[1].x,hand[1].y,0,0,9)];
+ c.fp=[mkPt(foot[0].x,foot[0].y,foot[0].vx,foot[0].vy,14),mkPt(foot[1].x,foot[1].y,foot[1].vx,foot[1].vy,14)];
+ c.offH=(b.rot+(b.sb||0)*.7+b.hx*.012+Math.sin(b.ph)*.01)-Math.atan2(head.x-nk[0],-(head.y-nk[1]));
+ // tembakan mematikan: badan terlempar + berputar di titik kena, kepala/tangan/kaki tersentak
+ const P=(hs?2.4:1.9)*(soft?.35:1)*(soft?KPW:1);
+ kick(c,ux*P,uy*P*.3-1,hx===undefined?c.cx:hx,hy===undefined?c.cy-BHt*.2:hy);c.w+=(Math.random()-.5)*.012;if(Math.abs(c.w)<.03)c.w=(ux>=0?1:-1)*(.03+Math.random()*.02); // lutut lemas: pasti jatuh
+ c.vy+=.6;
+ c.hd.vx+=ux*(hs?6:2.4)*SF;c.hd.vy+=(uy*3-(hs?3:1.2))*SF;
+ for(const p of c.hp){p.vx+=ux*3*SF;p.vy-=1.5*SF}for(const p of c.fp){p.vx+=ux*1.8*SF;p.vy-=1.2*SF}
+ const gm=Gp(...MAGC);
+ c.g={x:gun.x,y:gun.y,r:gun.r,vx:(ux*(2+Math.random()*2.5)+(gA.vx||0)*.4)*SF,vy:(-2.5-Math.random()*2.5)*(soft?.45:1),vr:ux*(.12+Math.random()*.2)*SF};
+ c.m={x:gm[0],y:gm[1],r:gun.r,d:d,vx:(ux*(1+Math.random()*1.5)+(Math.random()-.5)*1.6)*SF,vy:(-.6-Math.random()*1.2)*SF,vr:-ux*(.08+Math.random()*.16)*SF,air:1,t:0};
+ c.gst=b.gst||null;corpseSync(c);corpses.push(c);
+ const live=corpses.filter(o=>!o.fo);if(live.length>6)live[0].fo=true;
+ return c}
+function corpseSync(c){const o=lw(c,0,0),nk=up(c,0,-BHt*.97);c.Ox=o[0];c.Oy=o[1];c.aH=(c.hold||c.sev)?c.hAng:Math.atan2(c.hd.x-nk[0],-(c.hd.y-nk[1]))+c.offH}
+function corpseSub(c,dt){
+ const gv=.5,cp=cpts();
+ c.vy+=gv*dt;c.cx+=c.vx*dt;c.cy+=c.vy*dt;c.a+=c.w*dt;c.touch=0;let mp=0;
+ for(let it=0;it<2;it++)for(const q of cp){
+  const p=lw(c,q[0],q[1]),pen=p[1]+12-c.gy;if(pen<=0)continue;
+  if(pen>mp)mp=pen;c.touch=1;
+  const rx=p[0]-c.cx,ry=p[1]-c.cy,vpy=c.vy+c.w*rx;
+  if(vpy>0){const e=vpy>1.8?.22:0,j=(1+e)*vpy/(1+rx*rx/c.I);c.vy-=j;c.w-=rx*j/c.I;if(vpy>c.hard)c.hard=vpy;if(vpy>1.2)c.bv-=Math.sign(c.w||1)*Math.min(.06,j*.05);
+   const vtx=c.vx-c.w*ry,jt=cl(-vtx/(1+ry*ry/c.I),-.75*j,.75*j);c.vx+=jt;c.w-=ry*jt/c.I}}
+ if(mp>0)c.cy-=mp*.85;
+ if(c.touch){c.vx*=pw(.972,dt);c.w*=pw(.96,dt)}
+ // tulang belakang: badan atas tertinggal dari putaran pinggul (melengkung), pegas halus kembali lurus, hentakan saat menghantam lantai
+ c.bv+=-(c.w-(c.pw||0))*.9;c.pw=c.w;c.bv+=(-c.bd*.07-c.bv*.24)*dt;c.bd=cl(c.bd+c.bv*dt,-.5,.5);if(c.slit&&!c.sev&&c.bdT!==undefined){c.bd=lp(c.bd,c.bdT,Math.min(1,.12*dt));c.bv=0}
+ const nk=up(c,0,-BHt*.97),sh=up(c,0,-BHt*.72),hp=lw(c,0,-4);
+ const itg=p=>{p.px=p.x;p.py=p.y;p.vx*=pw(.992,dt);p.vy=p.vy*pw(.992,dt)+gv*dt;p.x+=p.vx*dt;p.y+=p.vy*dt};
+ const rp=(p,ax_,ay_,mn,mxl)=>{const dx=p.x-ax_,dy=p.y-ay_,d=Math.hypot(dx,dy)||1e-6;if(d>mxl){p.x=ax_+dx/d*mxl;p.y=ay_+dy/d*mxl}else if(d<mn){p.x=ax_+dx/d*mn;p.y=ay_+dy/d*mn}};
+ const gd=p=>{const lim=c.gy-p.r;if(p.y>lim){p.y=lim;p.hit=1}};
+ const fn=p=>{const pre=p.vy;p.vx=(p.x-p.px)/dt;p.vy=(p.y-p.py)/dt;if(p.hit){p.vx*=.82;p.vy=pre>3?-pre*.25:0;p.hit=0}};
+ // kepala: jarak ke leher tetap, tekukan dibatasi ±1.2 rad dari sumbu badan, pegas halus ke tegak
+ const hd=c.hd;if(c.hold){hd.px=hd.x;hd.py=hd.y;hd.vx=hd.vy=0}else{itg(hd);
+ if(!c.sev){const dx=hd.x-nk[0],dy=hd.y-nk[1],ua=Math.atan2(-Math.cos(c.a+c.bd),Math.sin(c.a+c.bd));let th=Math.atan2(dy,dx)-ua;th=Math.atan2(Math.sin(th),Math.cos(th));th=cl(th,-1.2,1.2)*(1-.012*dt);
+  const an=ua+th;hd.x=nk[0]+Math.cos(an)*c.L.h;hd.y=nk[1]+Math.sin(an)*c.L.h}
+ gd(hd);if(c.sev){const og=hd.y>=c.gy-hd.r-.5;c.hAng+=c.hAv*dt;if(og){c.hAv*=pw(.9,dt);hd.x=hd.px+(hd.x-hd.px)*.92}}fn(hd)}
+ for(let i=0;i<2;i++){const p=c.hp[i];itg(p);rp(p,sh[0],sh[1],16,c.L.a[i]);gd(p);fn(p)}
+ for(let i=0;i<2;i++){const p=c.fp[i];itg(p);rp(p,hp[0],hp[1],12,c.L.l[i]);gd(p);fn(p)}}
+function stepCorpse(c,f){c.age+=f;if(c.fo)c.fa-=.02*f;
+ const g=c.g;g.vy+=.5*f;g.x+=g.vx*f;g.y+=g.vy*f;g.r+=g.vr*f;if(g.y>c.gy-14){g.y=c.gy-14;g.vy=Math.abs(g.vy)>1.2?-g.vy*.3:0;g.vx*=.65;g.vr*=.5}
+ if(g.y>=c.gy-14.5&&Math.abs(g.vy)<.6)g.r+=(Math.round(g.r/Math.PI)*Math.PI-g.r)*.18*f; // senjata yang sudah mendarat direbahkan datar
+ const m=c.m;m.vy+=.5*f;m.x+=m.vx*f;m.y+=m.vy*f;m.r+=m.vr*f;m.t+=f;
+ if(m.y>c.gy-12){m.y=c.gy-12;const hard=Math.abs(m.vy)>1.4;m.air=0;m.vy=hard?-m.vy*.35:0;m.vx*=.7;m.vr*=.5}
+ if(m.y>=c.gy-12.5&&Math.abs(m.vy)<.6)m.r+=((Math.round((m.r-Math.PI/2)/Math.PI)*Math.PI+Math.PI/2)-m.r)*.14*f; // magazen rebah
+ if(c.cx<-RW+50){c.cx=-RW+50;c.vx=Math.abs(c.vx)*.2}else if(c.cx>RW-50){c.cx=RW-50;c.vx=-Math.abs(c.vx)*.2}
+ if(c.rest>=45)return;
+ const n=Math.max(1,Math.ceil(f)),dt=f/n;c.hard=0;
+ for(let s=0;s<n;s++)corpseSub(c,dt);
+ if(c.hard>2.2&&c.age-c.sa>12){c.sa=c.age;gSnd(c.hard>4.5,c.cx);const o=lw(c,0,-BHt*.3);for(let k=0;k<3;k++)dust.push({x:o[0]+(Math.random()-.5)*50,y:c.gy-4,vx:(Math.random()-.5)*2,vy:-.3-Math.random()*.6,l:.8})}
+ corpseSync(c);
+ let mv=Math.abs(c.vx)+Math.abs(c.vy)+Math.abs(c.w)*90;for(const p of [c.hd,...c.hp,...c.fp])mv+=Math.abs(p.x-p.px)+Math.abs(p.y-p.py);
+ c.rest=mv<1.2&&c.touch?c.rest+f:0}
+function corpseHit(c,x0,y0,x1,y1){const th=segEll(x0,y0,x1,y1,c.hd.x,c.hd.y,HRX(),HRY(),c.aH),tb=segRect(x0,y0,x1,y1,c.Ox,c.Oy,c.a,-Bw*.46,-BHt,Bw*.46,6);
+ if(th>=0&&(tb<0||th<=tb+.03))return{t:th,part:'h'};if(tb>=0)return{t:tb,part:'b'};return null}
+// ditembak saat sudah jatuh: badan tersentak & berputar di titik kena, kepala/tangan/kaki ikut terguncang
+function corpseShot(c,part,hx,hy,q){const vl=Math.hypot(q.vx,q.vy)||1,ux=q.vx/vl,uy=q.vy/vl,hs=part==='h';
+ hitFx(hx,hy,ux,uy,hs);bloodHit(null,c,hx,hy,ux,uy,hs,false,c.gy);
+ kick(c,ux*(hs?.9:1.15)*(q.pw?.4:1),uy*.5-.45,hx,hy);
+ c.hd.vx+=ux*(hs?7:2.6)*(q.pw?.5:1);c.hd.vy+=uy*3-(hs?2.2:1.2);
+ for(const p of c.hp){p.vx+=ux*2.6;p.vy-=1.4+Math.random()}for(const p of c.fp){p.vx+=ux*1.6;p.vy-=1+Math.random()*.8}
+ c.rest=0}
+// ---- potongan leher berlapis (kulit, lemak, otot, tulang/tenggorokan + darah di tengah); dicache sekali
+let NCV=null;function neckCutImg(){if(NCV)return NCV;const W=120,H=60,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d'),r=sr(777),cx=W/2,cy=H/2;
+ // lubang luka natural: tepi robek tak beraturan, gelap di tengah, tanpa cincin
+ const pts=[];const n=22;for(let i=0;i<n;i++){const a=i/n*6.2832,j=.72+r()*.38;pts.push([cx+Math.cos(a)*(W/2-6)*j,cy+Math.sin(a)*(H/2-5)*j*(.85+r()*.2)])}
+ const path=()=>{g.beginPath();pts.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));g.closePath()};
+ path();g.fillStyle='#6e0a12';g.fill();
+ g.save();path();g.clip();const gr=g.createRadialGradient(cx,cy,2,cx,cy,W*.42);gr.addColorStop(0,'#1c0204');gr.addColorStop(.55,'#4a060c');gr.addColorStop(1,'rgba(140,14,22,0)');g.fillStyle=gr;g.fillRect(0,0,W,H);
+ g.fillStyle='rgba(210,50,45,.35)';g.beginPath();g.ellipse(cx-10,cy-6,16,3,-.15,0,7);g.fill();g.restore();
+ return NCV=c}
+function drawNeckCut(w,drip){const im=neckCutImg(),h=w*im.height/im.width;ctx.drawImage(im,-w/2,-h/2,w,h);if(drip){ctx.fillStyle='rgba(120,6,12,.85)';ctx.beginPath();ctx.ellipse(0,h*.45+drip*.5,w*.07,drip,0,0,7);ctx.fill()}}
+function drawCHead(c){ctx.save();ctx.translate(c.hd.x,c.hd.y);ctx.rotate(c.aH);ctx.drawImage(c.hi,-c.hi.width*K/2,-c.hi.height*K/2,c.hi.width*K,c.hi.height*K);if(c.sev){ctx.save();ctx.translate(0,c.hi.height*K*.5-HRX()*.14);drawNeckCut(HRX()*.8,BLD&&FIN.c===c&&FIN.t<FG.D0?3+Math.abs(Math.sin(FIN.t*9))*7:0);ctx.restore()}ctx.restore();if(BLD){const w_=c.hi.width*K,h_=c.hi.height*K;wOv(c.hi,w_,h_,w_/2,h_/2,wlist(c,'h'),c.hd.x,c.hd.y,c.aH,0)}}
+function drawCorpse(c){const m=c.m;ctx.save();ctx.globalAlpha=Math.max(0,c.fa);
+ ctx.fillStyle='rgba(0,0,0,.33)';ctx.beginPath();ctx.ellipse(c.cx,c.gy+3,Math.abs(Math.sin(c.a))*BHt*.5+Bw*.45+10,8,0,0,7);ctx.fill();
+ [1,0].forEach(i=>{const F=c.fp[i];spr(c.d>0?IM.Foot2:IM.Foot1,F.x,F.y,c.a*.5)});
+ ctx.save();ctx.translate(c.g.x,c.g.y);ctx.rotate(c.g.r);ctx.scale(c.d,1);ctx.drawImage(gunImg(c.gst),-GW/2,-GH/2,GW,GH);ctx.restore();
+ ctx.save();ctx.translate(m.x,m.y);ctx.rotate(m.r);ctx.scale(m.d,1);ctx.drawImage(IM.Mag,-MW/2,-MH/2,MW,MH);ctx.restore();
+ drawBody(c.bi,c.Ox,c.Oy,c.a,c.bd||0,0);if(BLD)wOv(c.bi,Bw,BHt,Bw/2,BHt,wlist(c,'b'),c.Ox,c.Oy,c.a,0,c.bd||0);
+ drawCHead(c);
+ if(c.sev){const nk=up(c,0,-BHt*.97);ctx.save();ctx.translate(nk[0],nk[1]+0);ctx.rotate(c.a+(c.bd||0)+Math.PI);ctx.translate(0,-9);drawNeckCut(Bw*.42,0);ctx.restore()}
+ spr(IM['HandFist'+c.R],c.hp[0].x,c.hp[0].y,c.a,1,HK);spr(IM['HandFist'+c.R],c.hp[1].x,c.hp[1].y,c.a,1,HK);ctx.restore()}
+function pruneCorpses(){for(let i=corpses.length-1;i>=0;i--)if(corpses[i].fo&&corpses[i].fa<=0)corpses.splice(i,1)}
+function drawRounds(){for(const q of rounds){if(q.x<camX-40||q.x>camX+VW+40)continue;ctx.save();ctx.globalAlpha=Math.min(1,q.l*3);ctx.translate(q.x,q.y);ctx.rotate(q.r);
+ ctx.fillStyle='#d9ac4a';ctx.fillRect(-7,-2,9,4);ctx.fillStyle='#8d6a22';ctx.fillRect(-7,-2,1.8,4);
+ ctx.fillStyle='#b9712f';ctx.beginPath();ctx.moveTo(2,-2);ctx.lineTo(6.6,-.8);ctx.lineTo(6.6,.8);ctx.lineTo(2,2);ctx.closePath();ctx.fill();ctx.restore()}}
+// ---- dunia: partikel darah, peluru + tabrakan
+function targetList(){const L=[];
+ for(const o of bots){const r=o.rig;L.push({bot:o,R:r,id:o.id,hx:r.head.x,hy:r.head.y,bx:r.b.px,by:r.b.py,ang:r.b.rot})}
+ return L}
+function stepWorld(f){
+ stepBlood(f);
+ for(const q of dust){q.x+=q.vx*f;q.y+=q.vy*f;q.l-=.035*f}while(dust.length&&dust[0].l<=0)dust.shift();
+ for(const q of SMK){q.x+=q.vx*f;q.y+=q.vy*f;q.vx*=pw(.93,f);q.vy=q.vy*pw(.95,f)-.012*f;q.r+=q.gr*f;q.gr*=pw(.97,f);q.l-=.009*f}for(let i=SMK.length-1;i>=0;i--)if(SMK[i].l<=0)SMK.splice(i,1);
+ for(const q of drops){q.vy+=.5*f;q.x+=q.vx*f;q.y+=q.vy*f;q.r+=q.vr*f;if(q.y>q.gy){q.y=q.gy;q.vy=Math.abs(q.vy)>1.5?-q.vy*.3:0;q.vx*=.6;q.vr*=.5}q.l-=.004*f}while(drops.length&&drops[0].l<=0)drops.shift();
+ for(const q of shells){q.vy+=.45*f;q.x+=q.vx*f;q.y+=q.vy*f;q.r+=q.vr*f;if(q.y>q.gy){q.y=q.gy;if(!q.tk&&q.s){q.tk=1;tink(q.x)}q.vy=Math.abs(q.vy)>1.2?-q.vy*.35:0;q.vx*=.55;q.vr*=.4}q.l-=.006*f}while(shells.length&&shells[0].l<=0)shells.shift();
+ for(const q of rounds){q.vy+=.5*f;q.x+=q.vx*f;q.y+=q.vy*f;q.r+=q.vr*f;
+  if(q.y>q.gy){q.y=q.gy;const h=Math.abs(q.vy)>1.3;q.vy=h?-q.vy*.4:0;q.vx*=.82;q.vr*=h?.7:.55;if(!h)q.r+=(Math.round(q.r/Math.PI)*Math.PI-q.r)*.25}
+  q.l-=.0012*f}while(rounds.length&&rounds[0].l<=0)rounds.shift();
+ if(ME.dead)shk*=pw(.82,f);
+ const tg=targetList(),rx=HRX(),ry=HRY();
+ for(const q of bullets){
+  if(q.hit){q.l-=.05*f;continue}
+  const x0=q.x,y0=q.y,x1=x0+q.vx*f,y1=y0+q.vy*f;let bt=2,bh=null;
+  for(const T of tg){if(T.me?q.own:q.by===T.id)continue;
+   const th=segEll(x0,y0,x1,y1,T.hx,T.hy,rx,ry,T.ang),tb=segRect(x0,y0,x1,y1,T.bx,T.by,T.ang,-Bw*.46,-BHt,Bw*.46,FHt*.3);
+   let t=-1,part='';if(th>=0&&(tb<0||th<=tb+.03)){t=th;part='h'}else if(tb>=0){t=tb;part='b'}
+   if(t>=0&&t<bt){bt=t;bh={T,part}}}
+  for(const c of corpses){const r=corpseHit(c,x0,y0,x1,y1);if(r&&r.t<bt){bt=r.t;bh={c,part:r.part}}}
+  if(bh){const hx=x0+(x1-x0)*bt,hy=y0+(y1-y0)*bt;q.x=hx;q.y=hy;q.hit=1;q.l=Math.min(q.l,.3);
+   if(bh.c)corpseShot(bh.c,bh.part,hx,hy,q);else if(bh.T.bot&&q.own)botHit(bh.T.bot,q,bh.part,hx,hy)}
+  else{q.x=x1;q.y=y1;q.a=(q.a||0)+f;q.l-=.025*f}}
+ for(let i=bullets.length-1;i>=0;i--)if(bullets[i].l<=0)bullets.splice(i,1)}
+// ---- BOT: karakter yang sama, pose safety, diam di tempat spawn. Kena BOT_HITS tembakan -> jatuh.
+function puff(x,z){for(let i=0;i<9;i++)dust.push({x:x+(Math.random()-.5)*60,y:z+2,vx:(Math.random()-.5)*2.6,vy:-.3-Math.random()*.9,l:1})}
+function mkBot(x,z,dir){
+ const r=mkRig();r.pid='bot'+(++botSeq);const q=r.b;q.x=x;q.z=z;q.dir=q.t=dir;q.safe=true;q.sf=1;q.ap=-SAFE_ANG;
+ withRig(r,()=>{for(let i=0;i<40;i++)step(1)});
+ return{id:r.pid,rig:r,hp:BOT_HITS,hx:x,hz:z,dir:dir}}
+function spawnBot(){
+ if(!Bw)return;const sd=b.dir>0?1:-1;
+ {const lb=bots.filter(o=>!o.net);if(lb.length>=BOT_MAX){const o=lb[0];bots.splice(bots.indexOf(o),1);puff(o.rig.b.x,o.rig.b.z)}}
+ // bot muncul di depan moncong senjata (lebih jauh dari panjang senjata). 3 slot depan dulu, sisanya di belakang pemain
+ const SL=[[350,0],[430,-22],[510,22]];let pk=null;
+ for(const sg of [sd,-sd]){for(const q of SL){const px=b.x+sg*q[0],pz=b.z+q[1];if(!bots.some(o=>Math.abs(o.hx-px)<45&&Math.abs(o.hz-pz)<18)){pk={sg,x:px,z:pz};break}}if(pk)break}
+ if(!pk)pk={sg:sd,x:b.x+sd*350,z:b.z};
+ const side=pk.sg,x=cl(pk.x,-RW+110,RW-110),z=cl(pk.z,ZMIN,ZMAX);
+ bots.push(mkBot(x,z,-side));puff(x,z);vib(12);botToast('BOT '+bots.filter(o=>!o.net).length+'/'+BOT_MAX)}
+let btT=0;function botToast(m){const e=document.getElementById('toast');if(!e)return;e.textContent=m;e.classList.add('show');clearTimeout(btT);btT=setTimeout(()=>e.classList.remove('show'),1200)}
+function botHit(o,q,part,hx,hy){
+ const vl=Math.hypot(q.vx,q.vy)||1,ux=q.vx/vl,uy=q.vy/vl,hs=part==='h',PW=q.pw||1;
+ if(q.k1&&!o.dying&&!o.net)o.hp=1; // peluru 1-hit-kill (Benelli): sisa nyawa langsung jadi 1 -> hit ini yang mematikan
+ if(o.net&&q.own&&window.NET&&!o.dying)NET.hit(o,q,part,hx,hy,ux,uy);
+ hitFx(hx,hy,ux,uy,hs);bloodHit(o,null,hx,hy,ux,uy,hs,o.net?!!q.k1:(!o.dying&&o.hp<=1),o.rig.b.z+10);
+ if(o.dying){withRig(o.rig,()=>{b.sbv=(b.sbv||0)+ux*.12;b.hrv=(b.hrv||0)+ux*.03;head.vx+=ux*4;head.vy+=uy*2});return}
+ if(!o.net)o.hp--;
+ if(!o.net&&o.hp<=0){o.dying={ux,uy,part,hx,hy,t:0,pw:PW};
+  withRig(o.rig,()=>{const k=(hs?1.3:1)*PW;b.dyg=o.dying;b.dyt=0;b.hrv=ux*.004*k;b.sbv=(b.sbv||0)+ux*.16*k;b.hxv=ux*1.2*k;b.vx=cl(b.vx,-1,1)+ux*.8*PW;b.fz=2.2;head.vx+=ux*7*k;head.vy+=uy*3*k-(hs?3:1.2);gA.vx+=ux*2*PW;gA.vy+=uy*1.2-1.4;gA.vr+=ux*.1*PW;for(const F of foot){F.vx+=ux*1.4*PW;F.vy-=(1+Math.random())*(PW>1?1.6:1)}});return}
+ // tersentak: badan terdorong mundur (kaki melangkah), lutut menekuk, kepala tersentak, senjata & kaki terguncang
+ withRig(o.rig,()=>{const k=hs?1.4:1;
+  b.hrv=(b.hrv||0)+ux*.1*k;b.sbv=(b.sbv||0)+ux*.22*k;b.hxv=(b.hxv||0)+ux*2.4*k;b.vx+=ux*(2.6+(hs?1.2:0));b.hdv=(b.hdv||0)+2.6*k;b.fz=Math.max(b.fz||0,2.2);
+  head.vx+=ux*8*k;head.vy+=uy*3*k-(hs?3:1);
+  gA.vx+=ux*2.6;gA.vy+=uy*1.6-1.2;gA.vr+=ux*.12;
+  for(const F of foot){F.vx+=ux*2.6;F.vy-=1.6+Math.random()*1.4}})}
+function botDie(o,ux,uy,part,hx,hy){const i=bots.indexOf(o);if(i>=0)bots.splice(i,1);let cc=null;KPW=(o.dying&&o.dying.pw)||1;withRig(o.rig,()=>{cc=makeCorpse(ux,uy,part,hx,hy,true)});KPW=1;for(const w of WD)if(w.o===o){w.c=cc;w.o=null}for(const h of HL)if(h.o===o){h.c=cc;h.o=null}}
+// bot menjaga posisi: setelah terdorong ia melangkah pelan kembali ke tempat spawn (arah hadap tetap)
+function stepBots(f){for(const o of bots.slice()){let fin=false;withRig(o.rig,()=>{
+ if(o.dying){const D=o.dying;b.dyg=D;b.dyt=(b.dyt||0)+f/60;mx=my=0;ax=o.dir*.5;ay=0;step(f);
+  // setelah cukup rebah / lutut habis -> lepas ke fisika mayat (melanjutkan kecepatan yang sama)
+  if(b.dyt>.3&&(D.ux*b.hr>.7||b.dyt>.8))fin=true;return}
+ if(o.net){NET.drive(o,f);return}
+ const dx=o.hx-b.x,dz=o.hz-b.z;ax=o.dir*.5;ay=0;
+ mx=Math.abs(dx)>3?cl(dx*.02,-.55,.55):0;my=Math.abs(dz)>3?cl(dz*.02,-.4,.4):0;
+ step(f);
+ if(Math.abs(dx)<3&&Math.abs(b.vx)<.4)b.x+=(o.hx-b.x)*(1-pw(.9,f));
+ if(Math.abs(dz)<3&&Math.abs(b.vz)<.4)b.z+=(o.hz-b.z)*(1-pw(.9,f))});
+ if(fin){const D=o.dying;botDie(o,D.ux,D.uy,D.part,D.hx,D.hy)}}}
+function drawBotBar(o){if(o.net)return NET.bar(o);const w=11,g=3,tw=BOT_HITS*w+(BOT_HITS-1)*g,x0=b.x-tw/2,y=head.y-IM.Head5.height*K*.55-14;
+ ctx.fillStyle='rgba(10,10,12,.72)';ctx.fillRect(x0-2,y-2,tw+4,8);for(let i=0;i<BOT_HITS;i++){ctx.fillStyle=i<o.hp?'#58e070':'#3a3a3a';ctx.fillRect(x0+i*(w+g),y,w,4)}}
+let last=performance.now(),PA=0,PN=0;
+function loop(t){if(document.hidden){last=t;requestAnimationFrame(loop);return}const dt=t-last,f0=Math.min(Math.max(dt/16.667,.1),3),k=1-pw(.78,f0);WH.ts+=(WH.tt-WH.ts)*(1-pw(.82,f0));const f=Math.max(.03,f0*WH.ts);last=t;PA+=dt;PN++;if(PA>1500){PA=PN=0;}
+ {const fm=FIN.t>=0,smx=mx,smy=my;if(fm){mx=my=0}const n=Math.ceil(f/1.5);for(let i=0;i<n;i++){if(!ME.dead)step(f/n);stepWorld(f/n)}if(fm){mx=smx;my=smy}}finUpdate(f);stepBots(f);for(const c of corpses)stepCorpse(c,f);pruneCorpses();
+ window.NET&&NET.frame(t,f);CK.x*=pw(.8,f);CK.y*=pw(.8,f);{let tx=null;for(const o of bots){const d=o.hx-b.x;if(tx===null||Math.abs(d)<Math.abs(tx))tx=d}
+  for(const c of corpses)if(!c.fo){const d=c.cx-b.x;if(tx===null||Math.abs(d)<Math.abs(tx))tx=d}
+  camOff=0}
+ camX+=(cl(b.x-VW/2,-RW,Math.max(-RW,RW-VW))-camX)*k;camY+=(b.z-SY-camY)*k;draw();requestAnimationFrame(loop)}
+function spr(im,x,y,rot,fx,z){const w=im.width*K*(z||1),h=im.height*K*(z||1);ctx.save();ctx.translate(x,y);if(rot)ctx.rotate(rot);if(fx<0)ctx.scale(-1,1);ctx.drawImage(im,-w/2,-h/2,w,h);ctx.restore()}
+// magazen dipegang tangan: posisi magazen berputar mengelilingi tangan mengikuti sudut magazen (r), jadi tangan & magazen tetap satu kesatuan saat tiduran
+function magOff(gm,mh,r){const ox=0,oy=-3,c=Math.cos(r),s=Math.sin(r);return[ox*c-oy*s,ox*s+oy*c]}
+function drawMag2(){const gm=Gp(...MAGC),mh=Gp(...MAGH),H=hand[0];
+ for(const q of b.hd||[]){const o=magOff(gm,mh,q.r),x=lp(H.x+o[0]+(q.dx||0),gm[0],q.wi||0),y=lp(H.y+o[1]+(q.dy||0),gm[1],q.wi||0);b.mr=q.r;
+  ctx.save();ctx.translate(x,y);ctx.rotate(q.r);ctx.scale(b.dir,1);ctx.drawImage(MIM,-MW/2,-MH/2,MW,MH);ctx.restore()}}
+function drawMag(){if(b.mm==10)return drawMag2();const gm=Gp(...MAGC),mh=Gp(...MAGH),H=hand[0],t=b.rl2,m=b.mm,
+ wi=m==1?0:sg(t,.9,1.1),r=b.ck>=0&&m==1?b.ckr:m==1?lp(gun.r,b.dir*.14,sg(t,.3,.46)):lp(b.dir*.14,gun.r,sg(t,.8,1.1)),
+ o=magOff(gm,mh,r),x=lp(H.x+o[0],gm[0],wi),y=lp(H.y+o[1],gm[1],wi),mw=MW,mh2=MH;b.mr=r;
+ ctx.save();ctx.translate(x,y);ctx.rotate(r);ctx.scale(b.dir,1);ctx.drawImage(MIM,-mw/2,-mh2/2,mw,mh2);ctx.restore()}
+let GLOW=null;
+function drawChar(){
+ useW(b.gw|0);
+ const d=b.dir,sq=Math.abs(Math.sin(b.ph)),R=d>0?'R':'L',hs=n=>stnImg(b,'h',IM['Hand'+n+R]),inR=b.rl2>=0;
+ ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(b.x,b.z+3,44-sq*4,7,0,0,7);ctx.fill();
+ [1,0].forEach(i=>{const FI=d>0?IM.Foot2:IM.Foot1,fr_=b.rot*.5+(foot[i].r||0)*d;spr(FI,foot[i].x,foot[i].y,fr_);stnFoot(FI,foot[i].x,foot[i].y,fr_)});
+ const kgn=(b.kg||0)>.5,drawGun=()=>{ctx.save();ctx.translate(gun.x,gun.y);ctx.rotate(gun.r);ctx.scale(d,1);
+  if(b.mm==0||b.mm==4||(b.mm==10&&b.gm))ctx.drawImage(MIM,(MAGC[0]-.5)*GW-MW/2,(MAGC[1]-.5)*GH-MH/2,MW,MH);
+  ctx.drawImage(gunImg(b.gst),-GW/2,-GH/2,GW,GH);if(WI==1)ctx.drawImage(IM.GlockS,-GW/2-(b.sld||0)*GW*SLDK,-GH/2,GW,GH);ctx.restore()};
+ if(kgn)drawGun();
+ const h0b=(b.kw0||0)>.5&&!b.fnh;if(h0b)spr(hs('Fist'),hand[0].x,hand[0].y,b.fr||0,1,HK);
+ if(b.behind){if(b.mm==3)drawMag();spr(hs(b.supSpr),hand[0].x,hand[0].y,b.supSpr=='Mag'?(b.mr||0):gun.r,1,HK)}
+ {const BI=b.t<-.35?IM.Body1:b.t>.35?IM.Body3:IM.Body2,sy_=1+Math.sin(b.br)*.004;drawBody(BI,b.px,b.py,b.rot,b.sb||0,sy_);stnBody();if(BLD&&RIGID)wOv(BI,Bw,BHt,Bw/2,BHt,wlist(null,'b'),b.px,b.py,b.rot,sy_)}
+ const hf=cl(5+Math.round(b.t*2),3,7),HI=IM['Head'+(b.hp>0?'D':'')+hf],HA=b.rot+(b.sb||0)*.7+d*(b.fk||0)*.13+b.hx*.012+Math.sin(b.ph)*.01;spr(stnImg(b,'f',HI),head.x,head.y,HA);if(BLD&&RIGID){const w_=HI.width*K,h_=HI.height*K;wOv(HI,w_,h_,w_/2,h_/2,wlist(null,'h'),head.x,head.y,HA,0)}
+ if(!b.behind&&(b.mm==1||b.mm==3||b.mm==10))drawMag();
+ if(!kgn)drawGun();
+ if((b.ks||0)>.01)drawKnife(d);
+ spr(hs(b.h1s||'Grip'),hand[1].x,hand[1].y,lp(gun.r,(b.kR||0)+d*1.5708,b.kw1||0),1,HK);
+ if(!b.behind&&!h0b)spr(hs(b.supSpr),hand[0].x,hand[0].y,b.supSpr=='Mag'?(b.mr||0):((b.kw0||0)>.5?(b.fr||0):gun.r),1,HK);
+ drawKTrail();
+ // kilatan moncong + peluru (cahaya)
+ if(b.flash>.02){const m=Gp(...MUZ),fl=b.flash,L=((30+Math.random()*26)*fl+12)*(WI==1?.7:WI==3?2.3:1),ang=Math.atan2(d*Math.sin(gun.r),d*Math.cos(gun.r));
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  if(!GLOW){GLOW=document.createElement('canvas');GLOW.width=GLOW.height=256;const g=GLOW.getContext('2d'),gr=g.createRadialGradient(128,128,0,128,128,128);gr.addColorStop(0,'rgba(255,190,90,.38)');gr.addColorStop(1,'rgba(255,150,40,0)');g.fillStyle=gr;g.fillRect(0,0,256,256)}
+  const gs=WI==3?200:110;ctx.globalAlpha=fl;ctx.drawImage(GLOW,m[0]-gs,m[1]-gs,gs*2,gs*2);ctx.globalAlpha=1;if(WI==3&&fl>.3){ctx.globalAlpha=(fl-.3)*.16;ctx.fillStyle='#ffc47a';ctx.fillRect(camX-50,camY-50,VW+100,VH+100);ctx.globalAlpha=1}
+  ctx.translate(m[0],m[1]);ctx.rotate(ang);
+  if(WI==3){bnFlash(fl);ctx.restore()}else{const fg=ctx.createLinearGradient(0,0,L,0);fg.addColorStop(0,'#fff');fg.addColorStop(.35,'#ffe27a');fg.addColorStop(1,'rgba(255,110,30,0)');ctx.fillStyle=fg;
+  ctx.beginPath();ctx.moveTo(-4,-5);ctx.lineTo(L*.3,-13*fl-3);ctx.lineTo(L*.5,-4);ctx.lineTo(L,0);ctx.lineTo(L*.5,4);ctx.lineTo(L*.3,13*fl+3);ctx.lineTo(-4,5);ctx.closePath();ctx.fill();
+  for(let i=0;i<5;i++){const a=(Math.random()-.5)*2.2,l=L*(.35+Math.random()*.45);ctx.beginPath();ctx.moveTo(0,-2);ctx.lineTo(Math.cos(a)*l,Math.sin(a)*l);ctx.lineTo(0,2);ctx.closePath();ctx.fill()}
+  ctx.fillStyle='rgba(255,255,255,.95)';ctx.beginPath();ctx.arc(2,0,6+5*fl,0,7);ctx.fill();ctx.restore()}}}
+// ================= RUANGAN (v15): gudang bunker abu-abu dengan jendela, lampu gantung, pipa, pintu, peti & lantai berperspektif =================
+const RW=3800,WB=-175,ZMIN=-155,ZMAX=145; // RW = setengah lebar ruangan, WB = garis dasar dinding (y dunia), ZMIN/ZMAX = batas gerak maju-mundur
+const hh=(i,s)=>{const x=Math.sin(i*127.1+s*311.7)*43758.5453;return x-Math.floor(x)};
+const lgr=(x0,y0,x1,y1,st)=>{const g=ctx.createLinearGradient(x0,y0,x1,y1);for(const q of st)g.addColorStop(q[0],q[1]);return g};
+const rgr=(x,y,r,c0,c1)=>{const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,c0);g.addColorStop(1,c1);return g};
+function crate(x,y,w,h,tone){ctx.fillStyle='rgba(0,0,0,.38)';ctx.beginPath();ctx.ellipse(x+w/2,y+2,w*.62,7,0,0,7);ctx.fill();
+ ctx.fillStyle=lgr(x,y-h,x,y,[[0,'#5b4f58'],[1,'#3c323a']]);ctx.fillRect(x,y-h,w,h);
+ ctx.strokeStyle='rgba(0,0,0,.55)';ctx.lineWidth=2.4;ctx.strokeRect(x+1,y-h+1,w-2,h-2);
+ ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(x+4,y-h+4);ctx.lineTo(x+w-4,y-4);ctx.moveTo(x+w-4,y-h+4);ctx.lineTo(x+4,y-4);ctx.stroke();
+ ctx.fillStyle='rgba(255,255,255,.07)';ctx.fillRect(x+3,y-h+3,w-6,5);
+ ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=1.2;for(let k=1;k<4;k++){ctx.beginPath();ctx.moveTo(x+2,y-h+h*k/4);ctx.lineTo(x+w-2,y-h+h*k/4);ctx.stroke()}}
+function barrel(x,y,w,h,col){ctx.fillStyle='rgba(0,0,0,.4)';ctx.beginPath();ctx.ellipse(x,y+2,w*.62,6,0,0,7);ctx.fill();
+ ctx.fillStyle=lgr(x-w/2,0,x+w/2,0,[[0,col[0]],[.45,col[1]],[1,col[2]]]);ctx.beginPath();ctx.moveTo(x-w/2,y-h+6);ctx.quadraticCurveTo(x-w/2-4,y-h/2,x-w/2,y-6);ctx.lineTo(x-w/2,y);ctx.lineTo(x+w/2,y);ctx.lineTo(x+w/2,y-6);ctx.quadraticCurveTo(x+w/2+4,y-h/2,x+w/2,y-h+6);ctx.closePath();ctx.fill();
+ ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(x-w/2-2,y-h*.28,w+4,4);ctx.fillRect(x-w/2-2,y-h*.72,w+4,4);
+ ctx.fillStyle=col[1];ctx.beginPath();ctx.ellipse(x,y-h+5,w/2,6,0,0,7);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=1.6;ctx.stroke()}
+function drawRoom(tn){
+ const x0=camX-40,x1=camX+VW+40,yT=camY-12,yB=camY+VH+40;ctx.save();
+ // ---- dinding
+ ctx.fillStyle=lgr(0,yT,0,WB,[[0,'#241c24'],[.55,'#382e37'],[1,'#443842']]);ctx.fillRect(x0,yT,x1-x0,WB-yT);
+ const PW=240;for(let i=Math.floor(x0/PW);i*PW<x1;i++){const px=i*PW;
+  ctx.fillStyle='rgba(255,255,255,'+(hh(i,1)*.05)+')';ctx.fillRect(px,yT,PW,WB-yT);
+  ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(px-1,yT,2.4,WB-yT);ctx.fillStyle='rgba(255,255,255,.05)';ctx.fillRect(px+1.4,yT,1.4,WB-yT);
+  ctx.fillStyle='rgba(0,0,0,.42)';for(let k=0;k<5;k++){ctx.beginPath();ctx.arc(px+9,WB-26-k*34,2,0,7);ctx.fill();ctx.beginPath();ctx.arc(px-9,WB-26-k*34,2,0,7);ctx.fill()}
+  if(hh(i,2)>.55){ctx.fillStyle='rgba(0,0,0,'+(.1+hh(i,3)*.1)+')';ctx.beginPath();ctx.ellipse(px+60+hh(i,4)*120,WB-70-hh(i,5)*90,30+hh(i,6)*40,16+hh(i,7)*18,0,0,7);ctx.fill()}}
+ // rel horizontal + wainscot
+ ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x0,WB-124,x1-x0,3);ctx.fillStyle='rgba(255,255,255,.06)';ctx.fillRect(x0,WB-121,x1-x0,2);
+ ctx.fillStyle='#292129';ctx.fillRect(x0,WB-58,x1-x0,58);ctx.fillStyle='#4d414b';ctx.fillRect(x0,WB-60,x1-x0,3.5);ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(x0,WB-56.5,x1-x0,2);
+ ctx.fillStyle='rgba(0,0,0,.28)';for(let g=Math.floor(x0/46)*46;g<x1;g+=46)ctx.fillRect(g,WB-54,2,46);
+ ctx.fillStyle='#1b151b';ctx.fillRect(x0,WB-9,x1-x0,9);ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(x0,WB-9,x1-x0,1.6);
+ // ---- pipa
+ for(const P of [[150,12,'#6d636b'],[176,7,'#5a5059']]){const y=WB-P[0];ctx.fillStyle=lgr(0,y,0,y+P[1],[[0,P[2]],[.45,'#463c45'],[1,'#241c24']]);ctx.fillRect(x0,y,x1-x0,P[1]);
+  ctx.fillStyle='rgba(255,255,255,.14)';ctx.fillRect(x0,y+1.5,x1-x0,1.5);
+  for(let g=Math.floor(x0/210)*210;g<x1;g+=210){ctx.fillStyle='#2b232b';ctx.fillRect(g-3,y-3,7,P[1]+8);ctx.fillStyle='#524850';ctx.fillRect(g-5,y-2,3,P[1]+4)}}
+ for(let k=Math.floor(x0/700)-1;k*700<x1;k++){const vx=k*700+160,vy=WB-144;ctx.strokeStyle='#8a2e2e';ctx.lineWidth=3;ctx.beginPath();ctx.arc(vx,vy,11,0,7);ctx.stroke();ctx.beginPath();ctx.moveTo(vx-11,vy);ctx.lineTo(vx+11,vy);ctx.moveTo(vx,vy-11);ctx.lineTo(vx,vy+11);ctx.stroke();ctx.fillStyle='#2b232b';ctx.fillRect(vx-3,vy+10,6,8)}
+ // ---- tulisan stensil + poster
+ ctx.save();ctx.font='bold 46px Arial Black,Arial,sans-serif';ctx.fillStyle='rgba(235,225,215,.12)';ctx.textAlign='center';
+ for(let k=Math.floor(x0/1400)-1;k*1400<x1;k++){ctx.fillText('BAY '+String(((k%9)+9)%9+1).padStart(2,'0'),k*1400+640,WB-78)}ctx.restore();
+ for(let k=Math.floor(x0/900)-1;k*900<x1;k++){const px=k*900+110;if(hh(k,9)<.25)continue;ctx.save();ctx.translate(px,WB-100);ctx.rotate((hh(k,10)-.5)*.08);
+  ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(3,3,64,88);ctx.fillStyle='#cfc6b8';ctx.fillRect(0,0,64,88);ctx.fillStyle='#2a2229';ctx.fillRect(6,6,52,8);ctx.fillRect(6,70,30,5);ctx.fillRect(6,78,40,4);
+  ctx.fillStyle='#8c3a3a';ctx.beginPath();ctx.arc(32,42,17,0,7);ctx.fill();ctx.fillStyle='#cfc6b8';ctx.fillRect(14,38,36,8);ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.moveTo(64,70);ctx.lineTo(48,88);ctx.lineTo(64,88);ctx.fill();ctx.restore()}
+ // ---- jendela + berkas cahaya
+ const shafts=[];
+ for(let k=Math.floor(x0/560)-1;k*560<x1;k++){const wx=k*560+170,wy=WB-196,ww=130,wh=82;
+  ctx.fillStyle='#17111a';ctx.fillRect(wx-8,wy-8,ww+16,wh+16);
+  ctx.fillStyle=lgr(0,wy,0,wy+wh,[[0,'#b7bdc9'],[1,'#6d7380']]);ctx.fillRect(wx,wy,ww,wh);
+  ctx.fillStyle='rgba(255,255,255,.28)';ctx.beginPath();ctx.moveTo(wx+8,wy+wh);ctx.lineTo(wx+34,wy);ctx.lineTo(wx+54,wy);ctx.lineTo(wx+28,wy+wh);ctx.fill();
+  ctx.fillStyle='#1d161d';for(let j=1;j<4;j++)ctx.fillRect(wx+ww*j/4-2,wy,4,wh);ctx.fillRect(wx,wy+wh/2-2,ww,4);
+  ctx.fillStyle='#51454f';ctx.fillRect(wx-14,wy+wh+8,ww+28,8);ctx.fillStyle='rgba(255,255,255,.12)';ctx.fillRect(wx-14,wy+wh+8,ww+28,2);
+  shafts.push([wx,wy+wh,ww])}
+ // ---- pintu baja + shutter + peti + tong
+ for(let k=Math.floor((x0+760)/2200)-1;k*2200-760<x1;k++){const dx=k*2200-760;if(dx<x0-120||dx>x1+120)continue;
+  ctx.fillStyle='#17111a';ctx.fillRect(dx-52,WB-156,104,156);ctx.fillStyle=lgr(dx-46,0,dx+46,0,[[0,'#5a5058'],[.5,'#6b616a'],[1,'#463d45']]);ctx.fillRect(dx-46,WB-150,92,150);
+  ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=2;ctx.strokeRect(dx-36,WB-138,72,50);ctx.strokeRect(dx-36,WB-80,72,70);
+  ctx.fillStyle='#2a222a';ctx.fillRect(dx+26,WB-78,8,22);ctx.fillStyle='#b9b0a4';ctx.fillRect(dx+27,WB-76,3,18);
+  ctx.save();ctx.beginPath();ctx.rect(dx-46,WB-150,92,8);ctx.clip();ctx.fillStyle='#caa43a';ctx.fillRect(dx-46,WB-150,92,8);ctx.fillStyle='#17111a';for(let s=-60;s<100;s+=14){ctx.beginPath();ctx.moveTo(dx-46+s,WB-142);ctx.lineTo(dx-46+s+7,WB-142);ctx.lineTo(dx-46+s+14,WB-150);ctx.lineTo(dx-46+s+7,WB-150);ctx.fill()}ctx.restore();
+  ctx.fillStyle='#10281a';ctx.fillRect(dx-27,WB-186,54,21);ctx.strokeStyle='#050a07';ctx.lineWidth=2;ctx.strokeRect(dx-27,WB-186,54,21);
+  ctx.font='bold 14px Arial,sans-serif';ctx.textAlign='center';ctx.fillStyle='#8dffb4';ctx.fillText('EXIT',dx,WB-171);
+  ctx.globalCompositeOperation='lighter';ctx.fillStyle=rgr(dx,WB-175,70,'rgba(90,255,150,.22)','rgba(90,255,150,0)');ctx.fillRect(dx-70,WB-245,140,140);ctx.globalCompositeOperation='source-over'}
+ for(let k=Math.floor((x0-760)/2200)-1;k*2200+760<x1;k++){const sx=k*2200+760;if(sx<x0-160||sx>x1+160)continue;
+  ctx.fillStyle='#17111a';ctx.fillRect(sx-108,WB-168,216,168);ctx.fillStyle=lgr(0,WB-160,0,WB,[[0,'#5d535b'],[1,'#3d343c']]);ctx.fillRect(sx-100,WB-160,200,160);
+  ctx.fillStyle='rgba(0,0,0,.38)';for(let y=WB-160;y<WB;y+=14)ctx.fillRect(sx-100,y,200,2.4);ctx.fillStyle='rgba(255,255,255,.05)';for(let y=WB-158;y<WB;y+=14)ctx.fillRect(sx-100,y,200,1.4);
+  ctx.fillStyle='#2a222a';ctx.fillRect(sx-14,WB-14,28,8)}
+ for(let k=Math.floor((x0+420)/1500)-1;k*1500-420<x1;k++){const cx=k*1500-420;if(cx<x0-200||cx>x1+200)continue;
+  crate(cx,WB+8,74,74);crate(cx+78,WB+8,60,60);crate(cx+12,WB-66,62,56);barrel(cx+170,WB+10,44,66,['#3a4650','#4f5d68','#2a343c']);barrel(cx+216,WB+10,44,66,['#4b3a3a','#665050','#352828'])}
+ for(let k=Math.floor((x0-300)/1900)-1;k*1900+300<x1;k++){const cx=k*1900+300;if(cx<x0-200||cx>x1+200)continue;
+  barrel(cx,WB+10,46,70,['#3a4650','#4f5d68','#2a343c']);crate(cx+44,WB+8,80,80);crate(cx+130,WB+8,66,62)}
+ // ---- lantai
+ ctx.fillStyle=lgr(0,WB,0,WB+300,[[0,'#352c34'],[.35,'#272029'],[1,'#17121a']]);ctx.fillRect(x0,WB,x1-x0,yB-WB);
+ const vpx=camX+VW/2;ctx.lineWidth=1.6;ctx.strokeStyle='rgba(255,255,255,.055)';ctx.beginPath();
+ for(let xi=Math.floor(x0/150)*150-600;xi<x1+600;xi+=150){ctx.moveTo(xi,WB);ctx.lineTo(xi+(xi-vpx)*1.5,WB+320)}ctx.stroke();
+ for(let k=0,yy=14;yy<yB-WB;k++,yy*=1.36){ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x0,WB+yy,x1-x0,2.2);ctx.fillStyle='rgba(255,255,255,.04)';ctx.fillRect(x0,WB+yy+2.2,x1-x0,1.4)}
+ for(let i=Math.floor(x0/300)-1;i*300<x1;i++){if(hh(i,11)>.5){ctx.fillStyle='rgba(0,0,0,'+(.18+hh(i,12)*.14)+')';ctx.beginPath();ctx.ellipse(i*300+hh(i,13)*240,WB+34+hh(i,14)*150,26+hh(i,15)*46,7+hh(i,16)*10,0,0,7);ctx.fill()}}
+ ctx.fillStyle=lgr(0,WB,0,WB+34,[[0,'rgba(0,0,0,.5)'],[1,'rgba(0,0,0,0)']]);ctx.fillRect(x0,WB,x1-x0,34);
+ ctx.save();ctx.beginPath();ctx.rect(x0,WB+7,x1-x0,9);ctx.clip();ctx.fillStyle='rgba(212,170,50,.3)';ctx.fillRect(x0,WB+7,x1-x0,9);ctx.fillStyle='rgba(15,10,15,.5)';
+ for(let g=Math.floor(x0/30)*30-30;g<x1;g+=30){ctx.beginPath();ctx.moveTo(g,WB+16);ctx.lineTo(g+8,WB+7);ctx.lineTo(g+16,WB+7);ctx.lineTo(g+8,WB+16);ctx.fill()}ctx.restore();
+ // ---- cahaya: jendela (berkas + kolam di lantai) & lampu gantung
+ ctx.globalCompositeOperation='lighter';
+ for(const w of shafts){const wx=w[0],wb=w[1],ww=w[2],dx=90;
+  ctx.fillStyle=lgr(0,wb,0,WB,[[0,'rgba(190,200,225,.16)'],[1,'rgba(190,200,225,.05)']]);ctx.beginPath();ctx.moveTo(wx,wb);ctx.lineTo(wx+ww,wb);ctx.lineTo(wx+ww+dx,WB);ctx.lineTo(wx+dx,WB);ctx.fill();
+  ctx.fillStyle=lgr(0,WB,0,WB+120,[[0,'rgba(190,200,225,.14)'],[1,'rgba(190,200,225,0)']]);ctx.beginPath();ctx.moveTo(wx+dx,WB);ctx.lineTo(wx+ww+dx,WB);ctx.lineTo(wx+ww+dx+110,WB+120);ctx.lineTo(wx+dx+110,WB+120);ctx.fill()}
+ for(let k=Math.floor(x0/700)-1;k*700<x1+300;k++){const lx=k*700+350,ly=WB-214,fl=.94+Math.sin(tn*9+k*2.3)*.03+Math.sin(tn*23+k)*.02;
+  ctx.fillStyle=rgr(lx,ly+6,200,'rgba(255,205,120,'+(.3*fl)+')','rgba(255,205,120,0)');ctx.fillRect(lx-200,ly-190,400,400);
+  ctx.fillStyle=lgr(0,ly+10,0,WB+90,[[0,'rgba(255,214,140,.11)'],[1,'rgba(255,214,140,0)']]);ctx.beginPath();ctx.moveTo(lx-16,ly+10);ctx.lineTo(lx+16,ly+10);ctx.lineTo(lx+170,WB+90);ctx.lineTo(lx-170,WB+90);ctx.fill();
+  ctx.fillStyle=rgr(lx,WB+70,220,'rgba(255,205,130,.13)','rgba(255,205,130,0)');ctx.save();ctx.translate(lx,WB+70);ctx.scale(1,.22);ctx.translate(-lx,-(WB+70));ctx.fillRect(lx-220,WB+70-220,440,440);ctx.restore()}
+ ctx.globalCompositeOperation='source-over';
+ for(let k=Math.floor(x0/700)-1;k*700<x1+300;k++){const lx=k*700+350,ly=WB-214;ctx.strokeStyle='#120d12';ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(lx,yT);ctx.lineTo(lx,ly);ctx.stroke();
+  ctx.fillStyle='#1c161c';ctx.beginPath();ctx.moveTo(lx-6,ly);ctx.lineTo(lx+6,ly);ctx.lineTo(lx+24,ly+14);ctx.lineTo(lx-24,ly+14);ctx.closePath();ctx.fill();ctx.fillStyle='#ffe2a6';ctx.beginPath();ctx.ellipse(lx,ly+14,17,4,0,0,7);ctx.fill()}
+ // ---- debu melayang
+ ctx.fillStyle='#fff';for(let i=0;i<30;i++){const px=camX+((i*137.5+tn*(4+i%5))%(VW+80)),py=camY+((i*71.3+Math.sin(tn*.4+i)*30+tn*(2+i%3))%380);ctx.globalAlpha=.05+.07*Math.abs(Math.sin(tn*.7+i*1.7));ctx.beginPath();ctx.arc(px,py,1+(i%3)*.5,0,7);ctx.fill()}
+ ctx.globalAlpha=1;ctx.restore()}
+let VIGC=null;function mkVig(){VIGC=document.createElement('canvas');VIGC.width=cv.width;VIGC.height=cv.height;const g=VIGC.getContext('2d'),w=cv.width,h=cv.height,gr=g.createRadialGradient(w/2,h*.55,h*.35,w/2,h*.55,Math.hypot(w,h)*.62);gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,'rgba(6,3,8,.6)');g.fillStyle=gr;g.fillRect(0,0,w,h)}
+function draw(){ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(bgc,0,0);
+ ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';const tn=performance.now()*.001,nx=(Math.sin(tn*71)+Math.sin(tn*43+1.7)*.7)*.5+(Math.random()-.5)*.35,ny=(Math.sin(tn*83+.6)+Math.sin(tn*51+2.4)*.7)*.5+(Math.random()-.5)*.35;
+ ctx.setTransform(S,0,0,S,-camX*S+(nx*shk+CK.x)*S,-camY*S+(ny*shk+CK.y)*S);
+ drawRoom(performance.now()*.001);
+ drawBlood();
+ for(const q of dust){ctx.fillStyle='rgba(170,165,165,'+(q.l*.3)+')';ctx.beginPath();ctx.arc(q.x,q.y,3+(1-q.l)*9,0,7);ctx.fill()}
+
+ for(const q of SMK){ctx.globalAlpha=Math.max(0,q.l)*q.a;ctx.fillStyle=q.c;ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,7);ctx.fill()}ctx.globalAlpha=1;
+ for(const q of shells){ctx.save();ctx.globalAlpha=Math.min(1,q.l*3);ctx.translate(q.x,q.y);ctx.rotate(q.r);if(q.s)ctx.scale(q.s,q.s);if(q.sh){ctx.fillStyle='#c42422';ctx.fillRect(-4.6,-2,6.6,4);ctx.fillStyle='#e8504a';ctx.fillRect(-4.6,-2,6.6,1.1);ctx.fillStyle='#d9ac4a';ctx.fillRect(2,-2,2.8,4);ctx.fillStyle='#8d6a22';ctx.fillRect(4,-2,.8,4)}else{ctx.fillStyle='#d9ac4a';ctx.fillRect(-3.2,-1.4,6.4,2.8);ctx.fillStyle='#f3d88a';ctx.fillRect(-3.2,-1.4,6.4,.9);ctx.fillStyle='#8d6a22';ctx.fillRect(-3.2,-1.4,1.6,2.8)}ctx.restore()}
+ for(const q of drops){ctx.save();ctx.globalAlpha=Math.min(1,q.l*3);ctx.translate(q.x,q.y);ctx.rotate(q.r);ctx.scale(q.d,1);ctx.drawImage(q.im||IM.Mag,-(q.w||MW)/2,-(q.h||MH)/2,q.w||MW,q.h||MH);ctx.restore()}
+  const loc=[{z:b.z,R:null}];for(const o of bots)loc.push({z:o.rig.b.z,R:o.rig,bot:o});
+ for(const c of corpses)loc.push({z:c.gy-10,C:c});
+ loc.sort((a,c)=>a.z-c.z);
+ for(const o of loc){if(o.C){useW(0);drawCorpse(o.C);continue}if(!o.R){if(!ME.dead)drawChar();continue}
+  withRig(o.R,()=>{drawChar();drawBotBar(o.bot)})}
+ if(b.fn&&FIN.c){drawCHead(FIN.c);spr(IM['HandFist'+(b.dir>0?'R':'L')],hand[0].x,hand[0].y,b.fr||0,1,HK)} // kepala menimpa pisau -> terlihat menggorok dari belakang kepala
+ drawRounds();drawBloodFly();
+ for(const q of bullets){const al=Math.min(1,q.l*2.2),tk=Math.min(1.5,q.a||0);ctx.save();ctx.lineCap='round';ctx.globalCompositeOperation='lighter';
+  ctx.strokeStyle='rgba(255,170,60,'+al*.3+')';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(q.x-q.vx*tk,q.y-q.vy*tk);ctx.lineTo(q.x,q.y);ctx.stroke();
+  ctx.strokeStyle='rgba(255,240,170,'+al+')';ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(q.x-q.vx*tk,q.y-q.vy*tk);ctx.lineTo(q.x,q.y);ctx.stroke();ctx.restore()}
+ if(!VIGC||VIGC.width!==cv.width||VIGC.height!==cv.height)mkVig();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(VIGC,0,0)}
+window.DBG={kn:toggleKnife,atk:knifeAtk,ck:()=>{b.ck=0},b,step,draw,hand,gun,set:(v,m)=>{b.rm=m|0;b.rl=v;frz=1;b.dropped=0;for(let i=0;i<40;i++)step(1)},idle:()=>{frz=0;b.rl=-1;drops.length=0;bullets.length=0;shells.length=0;ammo=MAGN;b.flash=0},shoot:()=>shoot(b.dir),ammo:()=>ammo,spawn:spawnBot,bots,corpses,rounds,bullets};
+// ---- joystick 2D + tombol + keyboard
+function stick(joy,kn,set,o){o=o||{};let id=null,t0=0,sx=0,sy=0,d0=0,mvd=0;
+ const mv=e=>{const r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+62),dy=e.clientY-(r.top+62),d=Math.hypot(dx,dy),m=Math.min(d,45),a=Math.atan2(dy,dx);
+  mvd=Math.max(mvd,Math.hypot(e.clientX-sx,e.clientY-sy));if(o.locked&&o.locked())return;
+  kn.style.left=37+Math.cos(a)*m+'px';kn.style.top=37+Math.sin(a)*m+'px';const u=d<8?0:Math.min(1,d/40);set(Math.cos(a)*u,Math.sin(a)*u,d>=FIRE_PUSH)};
+ const end=(e,cancel)=>{if(e.pointerId==id){id=null;set(0,0,false);kn.style.left='37px';kn.style.top='37px';
+   if(!cancel&&o.tap&&d0<32&&mvd<10&&performance.now()-t0<350)o.tap()}};
+ joy.addEventListener('pointerdown',e=>{id=e.pointerId;t0=performance.now();sx=e.clientX;sy=e.clientY;mvd=0;const r=joy.getBoundingClientRect();d0=Math.hypot(sx-(r.left+62),sy-(r.top+62));joy.setPointerCapture(id);mv(e)});
+ joy.addEventListener('pointermove',e=>{if(e.pointerId==id)mv(e)});joy.addEventListener('pointerup',e=>end(e,false));joy.addEventListener('pointercancel',e=>end(e,true));return()=>id}
+// kiri = gerak, kanan = bidik
+const jid=stick(document.getElementById('joy'),document.getElementById('knob'),(x,y)=>{mx=x;my=y});
+const kn2=document.getElementById('knob2'),bul=kn2.querySelector('svg'),shd=document.getElementById('shield'),j2=document.getElementById('joy2');
+// SAFETY: ketuk ikon peluru -> perisai hijau. Senjata TETAP bisa digerakkan & diarahkan seperti biasa, tapi TIDAK bisa menembak (reload tetap bisa). Ketuk lagi -> normal.
+function applySafeUi(){const on=!!b.fsafe;bul.style.display=on?'none':'';shd.style.display=on?'':'none';kn2.classList.toggle('safe',on);j2.classList.toggle('safe',on)}
+function toggleSafe(){if(ME.dead||b.rl>=0||b.sw>=0||b.wm||b.wt>=0)return;startSw(!b.fsafe)}
+const aid=stick(j2,kn2,(x,y,e)=>{ax=x;ay=y;fireS=e;bul.style.transform=(x||y)?'rotate('+Math.atan2(y,x)+'rad)':'';j2.style.borderColor=e&&!b.fsafe?'rgba(255,140,60,.95)':'';j2.style.background=e&&!b.fsafe?'rgba(255,120,40,.16)':''},{locked:()=>b.sw>=0||b.wm||b.wt>=0,tap:toggleSafe});
+addEventListener('pointerdown',audioInit,true);
+document.getElementById('br').addEventListener('pointerdown',reload);
+const bkB=document.getElementById('bk'),atkB=document.getElementById('atk');
+function setKnifeUi(on){document.body.classList.toggle('kn',on);bkB.classList.toggle('on',on);if(on){ax=ay=0;fireS=false}}
+
+// ================= WEAPON WHEEL =================
+// Tahan tombol ganti senjata (atau tahan Q) ~0,2 dtk -> lingkaran senjata muncul, game melambat & latar nge-blur. Geser jari/mouse ke arah senjata, lepas untuk memilih.
+// Ketuk cepat = tidak ada efek (tombol switch hanya berfungsi saat ditahan). Tambah senjata baru cukup menambah satu entri di WP.
+const WP=[{n:'AK-47',img:'Image/AKicon.png?v=1',w:112,eq(){equipGun(0)}},{n:'PISAU',img:'Image/Knife.png',w:86,eq(){if(!b.wm)toggleKnife()}},{n:'GLOCK 17',img:'Image/GlockF.png?v=9',imgs:['Image/GlockF.png?v=9','Image/GlockS.png?v=9'],w:100,h:64,eq(){equipGun(1)}},{n:'M4A1',img:'Image/M4icon.png?v=1',w:84,h:30,eq(){equipGun(2)}},{n:'BENELLI M4',img:'Image/BenelliIcon.png?v=2',w:84,h:30,eq(){equipGun(3)}}];
+const WH={on:false,held:false,tm:0,sx:0,sy:0,mx:0,my:0,hl:0,ts:1,tt:1},whEl=document.getElementById('wh'),whSvg=document.getElementById('whs'),WHR=150,WHr=64,whCur=()=>b.wm?1:(b.gw|0)==1?2:(b.gw|0)==2?3:(b.gw|0)==3?4:0;
+const whPol=(r,a)=>[Math.cos(a*Math.PI/180)*r,Math.sin(a*Math.PI/180)*r];
+(function whBuild(){const N=WP.length,NS='http://www.w3.org/2000/svg';let h='';
+ for(let i=0;i<N;i++){const ca=-90+i*360/N,a0=ca-180/N+(N>1?2.2:0),a1=ca+180/N-(N>1?2.2:0),o0=whPol(WHR,a0),o1=whPol(WHR,a1),i1=whPol(WHr,a1),i0=whPol(WHr,a0),lg=(a1-a0)>180?1:0,
+  d=N>1?`M${o0[0]} ${o0[1]}A${WHR} ${WHR} 0 ${lg} 1 ${o1[0]} ${o1[1]}L${i1[0]} ${i1[1]}A${WHr} ${WHr} 0 ${lg} 0 ${i0[0]} ${i0[1]}Z`:`M${WHR} 0A${WHR} ${WHR} 0 1 1 ${-WHR} 0A${WHR} ${WHR} 0 1 1 ${WHR} 0M${WHr} 0A${WHr} ${WHr} 0 1 0 ${-WHr} 0A${WHr} ${WHr} 0 1 0 ${WHr} 0Z`,
+  c=whPol((WHR+WHr)/2,ca),w=WP[i].w,im=new Image();im.src=WP[i].img;
+  h+=`<g><path class="seg" data-i="${i}" d="${d}"/><path class="cur" data-c="${i}" d="${d}" transform="scale(.965)"/>${(WP[i].imgs||[WP[i].img]).map(U=>`<image href="${U}" x="${c[0]-w/2}" y="${c[1]-(WP[i].h?WP[i].h/2:w*.17)}" width="${w}" height="${WP[i].h||w*.3}" preserveAspectRatio="xMidYMid meet" pointer-events="none"/>`).join('').replace(/<image /g,WP[i].imgs?'<image style="filter:brightness(2.4) contrast(1.1)" ':'<image ')}</g>`}
+ h+=`<text id="whn" x="0" y="6">AK-47</text>`;whSvg.innerHTML=h})();
+function whPaint(){whSvg.querySelectorAll('.seg').forEach(e=>e.classList.toggle('sel',+e.dataset.i===WH.hl));whSvg.querySelectorAll('.cur').forEach(e=>e.classList.toggle('on',+e.dataset.c===whCur()));document.getElementById('whn').textContent=WP[WH.hl].n}
+function whOpen(){if(WH.on||REM||ME.dead||FIN.t>=0||FIN.on)return;WH.on=true;WH.hl=whCur();WH.sx=WH.held==='k'?WH.mx:WH.sx;WH.sy=WH.held==='k'?WH.my:WH.sy;whPaint();whEl.classList.add('on');WH.tt=.14;fireS=false;ax=ay=0;vib(12);
+ if(!CSS.supports('backdrop-filter','blur(1px)')&&!CSS.supports('-webkit-backdrop-filter','blur(1px)'))cv.style.filter='blur(5px)'}
+function whClose(apply){if(!WH.on)return;WH.on=false;whEl.classList.remove('on');WH.tt=1;cv.style.filter='';if(apply&&WH.hl!==whCur())WP[WH.hl].eq()}
+function whMove(x,y){if(!WH.on)return;const dx=x-WH.sx,dy=y-WH.sy;if(Math.hypot(dx,dy)<26)return;const N=WP.length,st=360/N,a=Math.atan2(dy,dx)*180/Math.PI,i=((Math.round((a+90)/st)%N)+N)%N;if(i!==WH.hl){WH.hl=i;whPaint();vib(5)}}
+function whDown(x,y,src){if(WH.held)return;WH.held=src||true;WH.sx=x;WH.sy=y;clearTimeout(WH.tm);WH.tm=setTimeout(()=>{WH.tm=0;whOpen()},200)}
+function whUp(cancel){if(!WH.held)return;WH.held=false;if(WH.tm){clearTimeout(WH.tm);WH.tm=0;return}/* ketuk singkat = tidak ada efek; roda senjata hanya muncul kalau tombol DITAHAN */whClose(!cancel)}
+addEventListener('pointermove',e=>{WH.mx=e.clientX;WH.my=e.clientY;if(WH.on)whMove(e.clientX,e.clientY)},{passive:true});
+addEventListener('blur',()=>whUp(true));
+bkB.addEventListener('pointerdown',e=>{e.preventDefault();try{bkB.setPointerCapture(e.pointerId)}catch(_){}whDown(e.clientX,e.clientY,'p')});
+bkB.addEventListener('pointerup',e=>{e.preventDefault();whUp()});bkB.addEventListener('pointercancel',()=>whUp(true));
+{let aid2=null;const up=e=>{if(e.pointerId===aid2){aid2=null;finUp();b.katk=0;atkB.classList.remove('dn')}};
+ atkB.addEventListener('pointerdown',e=>{e.preventDefault();aid2=e.pointerId;try{atkB.setPointerCapture(e.pointerId)}catch(_){}atkB.classList.add('dn');finDown()});
+ atkB.addEventListener('pointerup',up);atkB.addEventListener('pointercancel',up);atkB.addEventListener('lostpointercapture',up)}
+document.getElementById('bs').addEventListener('pointerdown',e=>{e.preventDefault();spawnBot()});
+const KY={};function kb(){if(jid()!==null)return;let x=(KY.KeyD||KY.ArrowRight?1:0)-(KY.KeyA||KY.ArrowLeft?1:0),y=(KY.KeyS||KY.ArrowDown?1:0)-(KY.KeyW||KY.ArrowUp?1:0);const d=Math.hypot(x,y)||1;mx=x/d;my=y/d}
+function kba(){if(aid()!==null)return;let x=(KY.KeyL?1:0)-(KY.KeyJ?1:0),y=(KY.KeyK?1:0)-(KY.KeyI?1:0);const d=Math.hypot(x,y)||1;ax=x/d;ay=y/d}
+addEventListener('keydown',e=>{KY[e.code]=1;if(e.code=='KeyR')reload();if(e.code=='KeyQ'&&!e.repeat)whDown(WH.mx,WH.my,'k');if(WH.on&&(e.code=='Digit1'||e.code=='Digit2'||e.code=='Digit3'||e.code=='Digit4'||e.code=='Digit5')){const i=e.code=='Digit1'?0:e.code=='Digit2'?1:e.code=='Digit3'?2:e.code=='Digit4'?3:4;if(WP[i]){WH.hl=i;whPaint()}}if((e.code=='Space'||e.code=='KeyF')&&b.wm){e.preventDefault();if(!e.repeat)finDown()};if(e.code=='KeyG'&&!e.repeat)toggleSafe();if(e.code=='KeyB'&&!e.repeat)spawnBot();kb();kba()});addEventListener('keyup',e=>{KY[e.code]=0;if(e.code=='KeyQ')whUp();if(e.code=='Space'||e.code=='KeyF'){finUp();b.katk=0}kb();kba()});
+
+// ---- tombol mode reload (kanan atas) + toggle getar HP
+(()=>{const box=document.getElementById('rm'),btn=document.getElementById('rmb'),nm=document.getElementById('rmn'),ops=[...box.querySelectorAll('.ro[data-m]')],hb=document.getElementById('hapb'),hn=document.getElementById('hapn'),ts=document.getElementById('toast');let tt=0;
+ const names=['NORMAL','FAST','TACTICAL','IRAQI'];
+ function ui(){nm.textContent=names[MODE];ops.forEach(o=>o.classList.toggle('on',+o.dataset.m===MODE));hn.textContent=HAP?'ON':'OFF'}
+ function toast(m){ts.textContent=m;ts.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>ts.classList.remove('show'),1400)}
+ btn.addEventListener('click',()=>box.classList.toggle('open'));
+ ops.forEach(o=>o.addEventListener('click',()=>{MODE=+o.dataset.m;try{localStorage.setItem('rmode',MODE)}catch(e){}ui();box.classList.remove('open');toast('Reload: '+names[MODE]);vib(12)}));
+ const bb=document.getElementById('bldb'),bn=document.getElementById('bldn');bb.addEventListener('click',()=>{BLD=!BLD;try{localStorage.setItem('bld',BLD?'1':'0')}catch(e){}bn.textContent=BLD?'ON':'OFF'});bn.textContent=BLD?'ON':'OFF';
+ hb.addEventListener('click',()=>{HAP=!HAP;try{localStorage.setItem('hap',HAP?'1':'0')}catch(e){}ui();if(HAP)vib([25,40,25])});
+ addEventListener('pointerdown',e=>{if(!box.contains(e.target))box.classList.remove('open')},true);
+ ui()})();
+</script><script src="net.js?v=1"></script>
+</body></html>

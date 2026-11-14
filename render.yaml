@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: madness-combat
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: "echo no build"
+    startCommand: node server.js
+    healthCheckPath: /healthz
